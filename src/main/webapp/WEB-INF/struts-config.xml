@@ -1,0 +1,422 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE struts-config PUBLIC
+    "-//Apache Software Foundation//DTD Struts Configuration 1.3//EN"
+    "http://struts.apache.org/dtds/struts-config_1_3.dtd">
+
+<struts-config>
+
+    
+    
+    
+    
+    <form-beans>
+        <form-bean name="loginForm"
+                   type="com.example.bookstore.form.LoginForm"/>
+        <form-bean name="bookSearchForm"
+            type="com.example.bookstore.form.BookSearchForm"/>
+        <form-bean name="salesForm"
+                   type="com.example.bookstore.form.SalesForm"/>
+	    <form-bean name="stockAdjustmentForm"
+		           type="com.example.bookstore.form.StockAdjustmentForm"/>
+        <form-bean name="reportFilterForm"
+                   type="com.example.bookstore.form.ReportFilterForm"/>
+            <form-bean name="auditLogFilterForm"
+                       type="com.example.bookstore.form.AuditLogFilterForm"/>
+        <form-bean name="adminForm"
+                   type="com.example.bookstore.form.AdminForm"/>
+
+        
+        
+    </form-beans>
+
+    
+    
+    
+    <action-mappings>
+
+        
+        
+        
+
+        <action path="/login"
+                type="com.example.bookstore.action.LoginAction"
+                name="loginForm"
+                scope="session"
+                parameter="method"
+                validate="true"
+                input="/WEB-INF/jsp/bookstore/login.jsp">
+            <forward name="success" path="/home.do"/>
+            <forward name="success2" path="/WEB-INF/jsp/bookstore/welcome.jsp"/>
+            <forward name="failure" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+            <forward name="error" path="/WEB-INF/jsp/bookstore/error.jsp"/>
+        </action>
+
+        <action path="/logout"
+                type="com.example.bookstore.action.LoginAction"
+                parameter="method"
+                validate="false">
+            <forward name="success" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+        </action>
+
+        
+        
+        
+
+        <action path="/home"
+                type="com.example.bookstore.action.HomeAction"
+                validate="false">
+            <forward name="success" path="/WEB-INF/jsp/bookstore/home.jsp"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+            <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+        </action>
+
+        
+        
+        
+
+	    <action path="/book/search"
+		        type="com.example.bookstore.action.BookAction"
+		        name="bookSearchForm"
+		        scope="session"
+		        validate="false">
+		    <forward name="success" path="/WEB-INF/jsp/bookstore/book/search.jsp"/>
+		    <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+		    <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+	    </action>
+
+        
+        
+        
+
+        <action path="/sales/entry"
+                type="com.example.bookstore.action.SalesAction"
+                name="salesForm"
+                scope="session"
+                parameter="method"
+                validate="false">
+            <forward name="success" path="/WEB-INF/jsp/bookstore/sales/entry.jsp"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+            <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+        </action>
+
+        <action path="/sales/cart/add"
+                type="com.example.bookstore.action.SalesAction"
+                name="salesForm"
+                scope="session"
+                parameter="method"
+                validate="false">
+            <forward name="success" path="/sales/entry.do" redirect="true"/>
+            <forward name="successNew" path="/WEB-INF/jsp/bookstore/sales/entry.jsp"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+            <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+        </action>
+
+        <action path="/sales/cart/update"
+            type="com.example.bookstore.action.SalesAction"
+            name="salesForm"
+            scope="session"
+            parameter="method"
+            validate="false">
+            <forward name="success" path="/sales/entry.do" redirect="true"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+        </action>
+
+        <action path="/sales/cart/remove"
+                type="com.example.bookstore.action.SalesAction"
+                name="salesForm"
+                scope="session"
+                parameter="method"
+                validate="false">
+            <forward name="success" path="/sales/entry.do" redirect="true"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+            <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+        </action>
+
+        <action path="/sales/checkout"
+                type="com.example.bookstore.action.SalesAction"
+                name="salesForm"
+                scope="session"
+                parameter="method"
+                validate="false">
+            <forward name="success" path="/WEB-INF/jsp/bookstore/sales/checkout.jsp"/>
+            <forward name="successEdit" path="/WEB-INF/jsp/bookstore/sales/entry.jsp"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+            <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+            <forward name="error" path="/WEB-INF/jsp/bookstore/error.jsp"/>
+        </action>
+
+        <action path="/sales/checkout/submit"
+                type="com.example.bookstore.action.SalesAction"
+                name="salesForm"
+                scope="session"
+                parameter="method"
+                validate="true">
+            <forward name="success" path="/WEB-INF/jsp/bookstore/sales/confirmation.jsp"/>
+            <forward name="success2" path="/WEB-INF/jsp/bookstore/sales/checkout.jsp"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+            <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+            <forward name="error" path="/WEB-INF/jsp/bookstore/error.jsp"/>
+        </action>
+
+        
+
+        
+        
+        
+
+        <action path="/inventory/list"
+                type="com.example.bookstore.action.InventoryAction"
+                scope="session"
+                parameter="method"
+                validate="false">
+            <forward name="success" path="/WEB-INF/jsp/bookstore/inventory/list.jsp"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+        </action>
+
+        <action path="/inventory/detail"
+                type="com.example.bookstore.action.InventoryAction"
+                scope="session"
+                parameter="method"
+                validate="false">
+            <forward name="success" path="/WEB-INF/jsp/bookstore/inventory/detail.jsp"/>
+            <forward name="successNew" path="/WEB-INF/jsp/bookstore/inventory/list.jsp"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+        </action>
+
+        <action path="/inventory/adjust"
+                type="com.example.bookstore.action.InventoryAction"
+                name="stockAdjustmentForm"
+                scope="session"
+                parameter="method"
+                validate="true"
+                input="/WEB-INF/jsp/bookstore/inventory/adjust.jsp">
+            <forward name="success" path="/WEB-INF/jsp/bookstore/inventory/adjust.jsp"/>
+            <forward name="successEdit" path="/WEB-INF/jsp/bookstore/inventory/detail.jsp"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+            <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+        </action>
+
+        <action path="/inventory/ledger"
+            type="com.example.bookstore.action.InventoryAction"
+            scope="session"
+            parameter="method"
+            validate="false">
+            <forward name="success" path="/WEB-INF/jsp/bookstore/inventory/ledger.jsp"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+        </action>
+
+        <action path="/inventory/lowstock"
+                type="com.example.bookstore.action.InventoryAction"
+                scope="session"
+                parameter="method"
+                validate="false">
+            <forward name="success" path="/WEB-INF/jsp/bookstore/inventory/lowstock.jsp"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+        </action>
+
+        
+
+        
+        
+        
+
+        <action path="/supplier/list"
+                type="com.example.bookstore.action.PurchaseOrderAction"
+                parameter="method"
+                validate="false">
+            <forward name="success" path="/WEB-INF/jsp/bookstore/supplier/list.jsp"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+            <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+        </action>
+
+        <action path="/purchaseorder/list"
+                type="com.example.bookstore.action.PurchaseOrderAction"
+                parameter="method"
+                validate="false">
+            <forward name="success" path="/WEB-INF/jsp/bookstore/purchaseorder/list.jsp"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+            <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+        </action>
+
+        
+        
+        
+
+        <action path="/reports"
+                type="com.example.bookstore.action.ReportAction"
+                name="reportFilterForm"
+                scope="session"
+                parameter="method"
+                validate="false">
+            <forward name="success" path="/WEB-INF/jsp/bookstore/reports/menu.jsp"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+            <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+        </action>
+
+        <action path="/reports/daily"
+                type="com.example.bookstore.action.ReportAction"
+                name="reportFilterForm"
+                scope="session"
+                parameter="method"
+                validate="false">
+            <forward name="success" path="/WEB-INF/jsp/bookstore/reports/daily-sales.jsp"/>
+            <forward name="success2" path="/WEB-INF/jsp/bookstore/reports/menu.jsp"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+            <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+            <forward name="error" path="/WEB-INF/jsp/bookstore/error.jsp"/>
+        </action>
+
+        <action path="/reports/bybook"
+            type="com.example.bookstore.action.ReportAction"
+            name="reportFilterForm"
+            scope="session"
+            parameter="method"
+            validate="false">
+            <forward name="success" path="/WEB-INF/jsp/bookstore/reports/sales-by-book.jsp"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+            <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+        </action>
+
+        <action path="/reports/topbooks"
+                type="com.example.bookstore.action.ReportAction"
+                name="reportFilterForm"
+                scope="session"
+                parameter="method"
+                validate="false">
+            <forward name="success" path="/WEB-INF/jsp/bookstore/reports/top-books.jsp"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+            <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+        </action>
+
+        <action path="/export/csv"
+                type="com.example.bookstore.action.ReportAction"
+                name="reportFilterForm"
+                scope="session"
+                parameter="method"
+                validate="false">
+            
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+            <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+            <forward name="error" path="/WEB-INF/jsp/bookstore/error.jsp"/>
+        </action>
+
+        
+        
+        
+
+        <action path="/audit/log"
+                type="com.example.bookstore.action.AuditLogAction"
+                name="auditLogFilterForm"
+                scope="session"
+                validate="false">
+            <forward name="success" path="/WEB-INF/jsp/bookstore/audit/log.jsp"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+            <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+        </action>
+
+        
+
+        
+        
+        
+
+        <action path="/admin/home"
+                type="com.example.bookstore.action.AdminAction"
+                parameter="method"
+                validate="false">
+            <forward name="success" path="/WEB-INF/jsp/bookstore/admin/home.jsp"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+            <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+        </action>
+
+        
+        <action path="/admin/user/list"
+                type="com.example.bookstore.action.AdminAction"
+                parameter="method"
+                validate="false">
+            <forward name="success" path="/WEB-INF/jsp/bookstore/admin/user/list.jsp"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+            <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+        </action>
+
+        <action path="/admin/user/form"
+                type="com.example.bookstore.action.AdminAction"
+                name="adminForm"
+                scope="session"
+                parameter="method"
+                validate="false">
+            <forward name="success" path="/WEB-INF/jsp/bookstore/admin/user/form.jsp"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+            <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+        </action>
+
+        <action path="/admin/user/save"
+                type="com.example.bookstore.action.AdminAction"
+                name="adminForm"
+                scope="session"
+                parameter="method"
+                validate="true">
+            <forward name="success" path="/admin/user/list.do" redirect="true"/>
+            <forward name="successEdit" path="/WEB-INF/jsp/bookstore/admin/user/form.jsp"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+            <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+        </action>
+
+        <action path="/admin/user/toggleActive"
+                type="com.example.bookstore.action.AdminAction"
+                parameter="method"
+                validate="false">
+            <forward name="success" path="/admin/user/list.do" redirect="true"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+            <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+        </action>
+
+        
+        <action path="/admin/category/list"
+                type="com.example.bookstore.action.AdminAction"
+                parameter="method"
+                validate="false">
+            <forward name="success" path="/WEB-INF/jsp/bookstore/admin/category/list.jsp"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+            <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+        </action>
+
+        <action path="/admin/category/form"
+                type="com.example.bookstore.action.AdminAction"
+                name="adminForm"
+                scope="session"
+                parameter="method"
+                validate="false">
+            <forward name="success" path="/WEB-INF/jsp/bookstore/admin/category/form.jsp"/>
+            <forward name="successNew" path="/WEB-INF/jsp/bookstore/admin/category/list.jsp"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+            <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+        </action>
+
+            <action path="/admin/category/save"
+                    type="com.example.bookstore.action.AdminAction"
+                    name="adminForm"
+                    scope="session"
+                    parameter="method"
+                    validate="true">
+                <forward name="success" path="/admin/category/list.do" redirect="true"/>
+                <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+                <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+            </action>
+
+        <action path="/admin/category/delete"
+                type="com.example.bookstore.action.AdminAction"
+                parameter="method"
+                validate="false">
+            <forward name="success" path="/admin/category/list.do" redirect="true"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+            <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+        </action>
+
+    </action-mappings>
+
+    
+    <message-resources parameter="ApplicationResources"/>
+
+</struts-config>

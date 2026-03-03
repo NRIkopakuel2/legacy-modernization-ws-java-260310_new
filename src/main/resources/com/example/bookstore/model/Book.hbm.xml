@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE hibernate-mapping PUBLIC
+    "-//Hibernate/Hibernate Mapping DTD 3.0//EN"
+    "http://hibernate.sourceforge.net/hibernate-mapping-3.0.dtd">
+
+<hibernate-mapping package="com.example.bookstore.model">
+    <class name="Book" table="books">
+        <id name="id" column="id">
+            <generator class="native"/>
+        </id>
+
+        <property name="isbn" column="isbn" type="string" length="13"/>
+        <property name="title" column="title" type="string" length="255"/>
+        <property name="categoryId" column="category_id" type="string" length="20"/>
+        <property name="publisher" column="publisher" type="string" length="255"/>
+        <property name="pubDt" column="pub_dt" type="string" length="8"/>
+            <property name="listPrice" column="list_price" type="double"/>
+        <property name="taxRate" column="tax_rate" type="string" length="10"/>
+        <property name="status" column="status" type="string" length="20"/>
+        <property name="descr" column="descr" type="text"/>
+        <property name="qtyInStock" column="qty_in_stock" type="string" length="10"/>
+        <property name="preferredSupplierId" column="preferred_supplier_id" type="string" length="20"/>
+        <property name="crtDt" column="crt_dt" type="string" length="8"/>
+        <property name="updDt" column="upd_dt" type="string" length="8"/>
+        <property name="delFlg" column="del_flg" type="string" length="1"/>
+        <property name="free1" column="free1" type="string" length="200"/>
+        <property name="free2" column="free2" type="string" length="200"/>
+        <property name="free3" column="free3" type="string" length="200"/>
+    </class>
+</hibernate-mapping>

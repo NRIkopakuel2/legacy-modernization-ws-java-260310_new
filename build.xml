@@ -1,0 +1,588 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project name="legacy-struts-app" default="build" basedir=".">
+
+    <!-- Properties -->
+    <property name="src.dir" value="src/main/java"/>
+    <property name="test.src.dir" value="src/test/java"/>
+    <property name="webapp.dir" value="src/main/webapp"/>
+    <property name="lib.dir" value="lib"/>
+    <property name="build.dir" value="build"/>
+    <property name="classes.dir" value="${build.dir}/classes"/>
+    <property name="test.classes.dir" value="${build.dir}/test-classes"/>
+    <property name="war.dir" value="${build.dir}/war"/>
+    <property name="dist.dir" value="dist"/>
+    <property name="javadoc.dir" value="${build.dir}/docs/javadoc"/>
+
+    <property name="app.name" value="legacy-app"/>
+    <property name="war.file" value="${app.name}.war"/>
+
+    <!-- server paths -->
+    <property name="tomcat.dir" value="/usr/local/tomcat"/>
+    <property name="deploy.dir" value="/opt/deploy/bookstore"/>
+    <property name="jdk.home" value="/usr/java/jdk1.5.0_22"/>
+    <property name="backup.dir" value="/tmp/bookstore-backup"/>
+    <property name="prod.server" value="192.168.1.100"/>
+    <property name="staging.server" value="192.168.1.50"/>
+    <property environment="env"/>
+    <!-- unused properties from old build (kept just in case) -->
+    <property name="old.webapp.dir" value="/home/dev1/old-webapp"/>
+    <property name="ftp.host" value="ftp.internal.corp"/>
+    <property name="cvs.root" value=":pserver:build@cvs.internal.corp:/cvsroot"/>
+    <property name="dev.server" value="192.168.1.10"/>
+    <property name="log.dir" value="/var/log/bookstore"/>
+    <property name="mail.host" value="smtp.internal.corp"/>
+    <property name="db.host" value="db-server.internal"/>
+
+    <!-- Classpath -->
+    <path id="compile.classpath">
+        <fileset dir="${lib.dir}">
+            <include name="**/*.jar"/>
+        </fileset>
+        <fileset dir="${webapp.dir}/WEB-INF/lib">
+            <include name="**/*.jar"/>
+        </fileset>
+    </path>
+
+    <path id="test.classpath">
+        <path refid="compile.classpath"/>
+        <pathelement location="${classes.dir}"/>
+    </path>
+
+    <!-- extra classpath for dev build (not sure if still needed) -->
+    <path id="compile.classpath.extra">
+        <fileset dir="${lib.dir}">
+            <include name="**/*.jar"/>
+        </fileset>
+        <pathelement location="${classes.dir}"/>
+        <pathelement location="/usr/local/share/java/commons-all.jar"/>
+        <pathelement location="${jdk.home}/lib/tools.jar"/>
+    </path>
+
+    <!-- classpath used by prod build target (copy from compile.classpath but different) -->
+	<path id="compile.classpath.prod">
+		<fileset dir="${lib.dir}">
+			<include name="**/*.jar"/>
+		</fileset>
+		<pathelement location="${classes.dir}"/>
+		<pathelement location="/opt/deploy/shared-libs/commons-logging.jar"/>
+		<pathelement location="/opt/deploy/shared-libs/log4j.jar"/>
+	</path>
+
+    <!-- Targets -->
+    <!-- TODO: should we split init into init-dirs and init-props? (2004/06 tanaka) -->
+    <target name="init">
+        <mkdir dir="${build.dir}"/>
+        <mkdir dir="${classes.dir}"/>
+        <mkdir dir="${test.classes.dir}"/>
+        <mkdir dir="${war.dir}"/>
+        <mkdir dir="${dist.dir}"/>
+    </target>
+
+    <target name="clean">
+        <delete dir="${build.dir}" failonerror="false"/>
+        <!-- Delete contents of dist/ but keep the directory (Docker bind mount) -->
+        <delete failonerror="false">
+            <fileset dir="${dist.dir}" includes="**/*"/>
+        </delete>
+    </target>
+
+    <!-- NOTE: this target may not work on Windows due to path separator issues -->
+    <!-- FIXME: deprecation warnings from struts-taglib, ignore for now (2005/03) -->
+    <target name="compile" depends="init">
+        <javac srcdir="${src.dir}"
+               destdir="${classes.dir}"
+               classpathref="compile.classpath"
+               encoding="UTF-8"
+               source="1.5"
+               target="1.5"
+               debug="true"
+               deprecation="true"
+               includeantruntime="false"/>
+
+        <!-- Copy resources -->
+        <copy todir="${classes.dir}" failonerror="false">
+            <fileset dir="src/main/resources">
+                <include name="**/*"/>
+            </fileset>
+        </copy>
+    </target>
+
+    <!-- test compile - this was added by suzuki-san, not sure if it works (2005/08) -->
+    <target name="compile-tests" depends="compile" if="test.src.exists">
+        <available file="${test.src.dir}" type="dir" property="test.src.exists"/>
+        <javac srcdir="${test.src.dir}"
+               destdir="${test.classes.dir}"
+               classpathref="test.classpath"
+               encoding="UTF-8"
+               source="1.5"
+               target="1.5"
+               debug="true"
+               deprecation="true"
+               failonerror="false"/>
+    </target>
+
+    <target name="check-tests">
+        <available file="${test.src.dir}" type="dir" property="test.src.exists"/>
+    </target>
+
+    <!-- WARNING: war task takes long time if lib/ has many jars -->
+    <target name="war" depends="compile">
+        <!-- Ensure dist directory exists -->
+        <mkdir dir="${dist.dir}"/>
+
+        <!-- Copy webapp files -->
+        <copy todir="${war.dir}">
+            <fileset dir="${webapp.dir}"/>
+        </copy>
+
+        <!-- Copy classes -->
+        <copy todir="${war.dir}/WEB-INF/classes">
+            <fileset dir="${classes.dir}"/>
+        </copy>
+
+        <!-- Copy all JAR libraries to WEB-INF/lib -->
+        <!-- EXCLUDE servlet-api.jar and jsp-api.jar - Tomcat provides these -->
+        <copy todir="${war.dir}/WEB-INF/lib" flatten="true">
+            <fileset dir="${lib.dir}">
+                <include name="**/*.jar"/>
+                <exclude name="**/servlet-api*.jar"/>
+                <exclude name="**/jsp-api*.jar"/>
+            </fileset>
+        </copy>
+
+        <!-- Extract Struts TLD files from struts-taglib.jar to WEB-INF -->
+        <unjar src="${lib.dir}/struts-taglib-1.3.10.jar" dest="${build.dir}/tld-temp">
+            <patternset>
+                <include name="META-INF/tld/*.tld"/>
+            </patternset>
+        </unjar>
+        <copy todir="${war.dir}/WEB-INF" flatten="true">
+            <fileset dir="${build.dir}/tld-temp/META-INF/tld">
+                <include name="*.tld"/>
+            </fileset>
+        </copy>
+
+        <!-- Create WAR file -->
+        <jar destfile="${dist.dir}/${war.file}" basedir="${war.dir}"/>
+    </target>
+
+    <target name="javadoc" depends="init">
+        <javadoc sourcepath="${src.dir}"
+                 destdir="${javadoc.dir}"
+                 classpathref="compile.classpath"
+                 encoding="UTF-8"
+                 charset="UTF-8"
+                 windowtitle="${app.name} API"
+                 doctitle="${app.name} API Documentation">
+            <packageset dir="${src.dir}">
+                <include name="com/example/**"/>
+            </packageset>
+        </javadoc>
+    </target>
+
+    <target name="build" depends="clean, compile, check-tests, compile-tests, war, javadoc">
+        <echo message="Build completed successfully!"/>
+    </target>
+
+    <!-- ================================================================== -->
+    <!-- Environment-specific build targets                                  -->
+    <!-- Each one is slightly different (copied from build target)           -->
+    <!-- ================================================================== -->
+
+    <!-- dev build - uses extra classpath, same as build but different classpath -->
+  <target name="build-dev" depends="clean, init">
+    <echo message="Starting DEV build..."/>
+    <echo message="Using JAVA_HOME: ${env.JAVA_HOME}"/>
+    <javac srcdir="${src.dir}"
+           destdir="${classes.dir}"
+           classpathref="compile.classpath.extra"
+           encoding="UTF-8"
+           source="1.5"
+           target="1.5"
+           debug="true"
+           deprecation="true"
+           includeantruntime="false"/>
+    <copy todir="${classes.dir}" failonerror="false">
+        <fileset dir="src/main/resources">
+            <include name="**/*"/>
+        </fileset>
+    </copy>
+    <!-- copy dev-specific config -->
+    <copy file="config/dev/application.properties" todir="${classes.dir}" failonerror="false"/>
+    <mkdir dir="${dist.dir}"/>
+    <copy todir="${war.dir}">
+        <fileset dir="${webapp.dir}"/>
+    </copy>
+    <copy todir="${war.dir}/WEB-INF/classes">
+        <fileset dir="${classes.dir}"/>
+    </copy>
+    <copy todir="${war.dir}/WEB-INF/lib" flatten="true">
+        <fileset dir="${lib.dir}">
+            <include name="**/*.jar"/>
+            <exclude name="**/servlet-api*.jar"/>
+            <exclude name="**/jsp-api*.jar"/>
+        </fileset>
+    </copy>
+    <unjar src="${lib.dir}/struts-taglib-1.3.10.jar" dest="${build.dir}/tld-temp">
+        <patternset>
+            <include name="META-INF/tld/*.tld"/>
+        </patternset>
+    </unjar>
+    <copy todir="${war.dir}/WEB-INF" flatten="true">
+        <fileset dir="${build.dir}/tld-temp/META-INF/tld">
+            <include name="*.tld"/>
+        </fileset>
+    </copy>
+    <jar destfile="${dist.dir}/${war.file}" basedir="${war.dir}"/>
+    <echo message="DEV build completed!"/>
+  </target>
+
+    <!-- staging build - almost same as dev but different config path -->
+    <target name="build-staging" depends="clean, init">
+        <echo message="Starting STAGING build..."/>
+        <echo message="Hostname: ${env.HOSTNAME}"/>
+        <property name="staging.debug" value="false"/>
+        <javac srcdir="${src.dir}"
+               destdir="${classes.dir}"
+               classpathref="compile.classpath"
+               encoding="UTF-8"
+               source="1.5"
+               target="1.5"
+               debug="${staging.debug}"
+               deprecation="false"
+               includeantruntime="false"/>
+        <copy todir="${classes.dir}" failonerror="false">
+            <fileset dir="src/main/resources">
+                <include name="**/*"/>
+            </fileset>
+        </copy>
+        <!-- copy staging config -->
+        <copy file="config/staging/application.properties" todir="${classes.dir}" failonerror="false"/>
+        <mkdir dir="${dist.dir}"/>
+        <copy todir="${war.dir}">
+            <fileset dir="${webapp.dir}"/>
+        </copy>
+        <copy todir="${war.dir}/WEB-INF/classes">
+            <fileset dir="${classes.dir}"/>
+        </copy>
+        <copy todir="${war.dir}/WEB-INF/lib" flatten="true">
+            <fileset dir="${lib.dir}">
+                <include name="**/*.jar"/>
+                <exclude name="**/servlet-api*.jar"/>
+                <exclude name="**/jsp-api*.jar"/>
+            </fileset>
+        </copy>
+        <unjar src="${lib.dir}/struts-taglib-1.3.10.jar" dest="${build.dir}/tld-temp">
+            <patternset>
+                <include name="META-INF/tld/*.tld"/>
+            </patternset>
+        </unjar>
+        <copy todir="${war.dir}/WEB-INF" flatten="true">
+            <fileset dir="${build.dir}/tld-temp/META-INF/tld">
+                <include name="*.tld"/>
+            </fileset>
+        </copy>
+        <jar destfile="${dist.dir}/${war.file}" basedir="${war.dir}"/>
+        <echo message="STAGING build completed!"/>
+    </target>
+
+	<!-- prod build - uses prod classpath, hard-coded paths, no debug -->
+	<target name="build-prod" depends="clean, init">
+		<echo message="Starting PRODUCTION build..."/>
+		<echo message="Building for server: ${prod.server}"/>
+		<echo message="JAVA_HOME is: ${env.JAVA_HOME}"/>
+		<property name="prod.debug" value="false"/>
+		<javac srcdir="${src.dir}"
+			   destdir="${classes.dir}"
+			   classpathref="compile.classpath.prod"
+			   encoding="UTF-8"
+			   source="1.5"
+			   target="1.5"
+			   debug="${prod.debug}"
+			   deprecation="false"
+			   includeantruntime="false"
+			   optimize="true"/>
+		<copy todir="${classes.dir}" failonerror="false">
+			<fileset dir="src/main/resources">
+				<include name="**/*"/>
+			</fileset>
+		</copy>
+		<!-- copy prod config - make sure this file exists! -->
+		<copy file="config/prod/application.properties" todir="${classes.dir}" failonerror="false"/>
+		<!-- remove debug logging config for prod -->
+		<replace file="${classes.dir}/log4j.properties" token="DEBUG" value="ERROR" failOnNoReplacements="false"/>
+		<mkdir dir="${dist.dir}"/>
+		<copy todir="${war.dir}">
+			<fileset dir="${webapp.dir}"/>
+		</copy>
+		<copy todir="${war.dir}/WEB-INF/classes">
+			<fileset dir="${classes.dir}"/>
+		</copy>
+		<copy todir="${war.dir}/WEB-INF/lib" flatten="true">
+			<fileset dir="${lib.dir}">
+				<include name="**/*.jar"/>
+				<exclude name="**/servlet-api*.jar"/>
+				<exclude name="**/jsp-api*.jar"/>
+			</fileset>
+		</copy>
+		<unjar src="${lib.dir}/struts-taglib-1.3.10.jar" dest="${build.dir}/tld-temp">
+			<patternset>
+				<include name="META-INF/tld/*.tld"/>
+			</patternset>
+		</unjar>
+		<copy todir="${war.dir}/WEB-INF" flatten="true">
+			<fileset dir="${build.dir}/tld-temp/META-INF/tld">
+				<include name="*.tld"/>
+			</fileset>
+		</copy>
+		<jar destfile="${dist.dir}/${war.file}" basedir="${war.dir}"/>
+		<echo message="PRODUCTION build completed! Deploy to ${prod.server}"/>
+	</target>
+
+    <!-- ================================================================== -->
+    <!-- Deployment targets                                                  -->
+    <!-- NOTE: deploy targets assume Linux, will not work on Windows         -->
+    <!-- ================================================================== -->
+
+    <!-- mega deploy: build + deploy everywhere (used by nightly cron job) -->
+    <target name="deploy-all" depends="build">
+        <echo message="========================================"/>
+        <echo message="  DEPLOYING TO ALL SERVERS"/>
+        <echo message="========================================"/>
+        <echo message="Copying WAR to dev server..."/>
+        <copy file="${dist.dir}/${war.file}" todir="/opt/deploy/dev/webapps" failonerror="false"/>
+        <echo message="Copying WAR to staging server..."/>
+        <copy file="${dist.dir}/${war.file}" todir="/opt/deploy/staging/webapps" failonerror="false"/>
+        <echo message="Backing up prod WAR..."/>
+        <copy file="/opt/deploy/prod/webapps/${war.file}" todir="${backup.dir}" failonerror="false"/>
+        <echo message="Copying WAR to prod server..."/>
+        <copy file="${dist.dir}/${war.file}" todir="/opt/deploy/prod/webapps" failonerror="false"/>
+        <echo message="Deploy completed to all servers!"/>
+        <echo message="  dev: /opt/deploy/dev/webapps/${war.file}"/>
+        <echo message="  staging: /opt/deploy/staging/webapps/${war.file}"/>
+        <echo message="  prod: /opt/deploy/prod/webapps/${war.file}"/>
+        <echo message="Remember to restart Tomcat on each server!"/>
+    </target>
+
+  <!-- deploy to dev only -->
+  <target name="deploy-dev">
+    <echo message="Deploying to DEV..."/>
+    <copy file="${dist.dir}/${war.file}" todir="${tomcat.dir}/webapps" failonerror="false"/>
+    <echo message="Deployed to ${tomcat.dir}/webapps/${war.file}"/>
+    <echo message="Restart Tomcat to pick up changes"/>
+  </target>
+
+  <!-- deploy to staging -->
+  <target name="deploy-staging">
+    <echo message="Deploying to STAGING (${staging.server})..."/>
+    <copy file="${dist.dir}/${war.file}" todir="/opt/deploy/staging/webapps" failonerror="false"/>
+    <echo message="Deployed to staging. Remember to restart!"/>
+  </target>
+
+	<!-- deploy to prod (with backup) -->
+	<target name="deploy-prod">
+		<echo message="Deploying to PRODUCTION (${prod.server})..."/>
+		<echo message="Creating backup first..."/>
+		<mkdir dir="${backup.dir}"/>
+		<tstamp>
+			<format property="backup.timestamp" pattern="yyyyMMdd_HHmmss"/>
+		</tstamp>
+		<copy file="/opt/deploy/prod/webapps/${war.file}"
+			  tofile="${backup.dir}/${app.name}_${backup.timestamp}.war"
+			  failonerror="false"/>
+		<echo message="Backup saved to ${backup.dir}/${app.name}_${backup.timestamp}.war"/>
+		<copy file="${dist.dir}/${war.file}" todir="/opt/deploy/prod/webapps" failonerror="false"/>
+		<echo message="**** PRODUCTION DEPLOY COMPLETE ****"/>
+		<echo message="Server: ${prod.server}"/>
+		<echo message="WAR: /opt/deploy/prod/webapps/${war.file}"/>
+		<echo message="Backup: ${backup.dir}/${app.name}_${backup.timestamp}.war"/>
+		<echo message="IMPORTANT: Run restart-tomcat target or manually restart!"/>
+	</target>
+
+    <!-- hot deploy: copy classes directly to running tomcat (skip WAR packaging) -->
+    <!-- WARNING: this can cause classloader issues, use at your own risk -->
+    <target name="hot-deploy" depends="compile">
+        <echo message="HOT DEPLOYING classes to Tomcat..."/>
+        <echo message="Target: ${tomcat.dir}/webapps/${app.name}/WEB-INF/classes"/>
+        <copy todir="${tomcat.dir}/webapps/${app.name}/WEB-INF/classes" failonerror="false">
+            <fileset dir="${classes.dir}"/>
+        </copy>
+        <copy todir="${tomcat.dir}/webapps/${app.name}" failonerror="false">
+            <fileset dir="${webapp.dir}">
+                <include name="**/*.jsp"/>
+                <include name="**/*.js"/>
+                <include name="**/*.css"/>
+            </fileset>
+        </copy>
+        <echo message="Hot deploy complete. Tomcat should auto-reload."/>
+        <echo message="If not, run restart-tomcat target."/>
+    </target>
+
+    <!-- manually copy specific library jars (used when adding new dependency) -->
+    <target name="copy-libs">
+        <echo message="Copying library JARs..."/>
+        <copy file="${lib.dir}/struts-core-1.3.10.jar" todir="${webapp.dir}/WEB-INF/lib" failonerror="false"/>
+        <copy file="${lib.dir}/struts-taglib-1.3.10.jar" todir="${webapp.dir}/WEB-INF/lib" failonerror="false"/>
+        <copy file="${lib.dir}/struts-extras-1.3.10.jar" todir="${webapp.dir}/WEB-INF/lib" failonerror="false"/>
+        <copy file="${lib.dir}/commons-beanutils-1.8.0.jar" todir="${webapp.dir}/WEB-INF/lib" failonerror="false"/>
+        <copy file="${lib.dir}/commons-digester-1.8.jar" todir="${webapp.dir}/WEB-INF/lib" failonerror="false"/>
+        <copy file="${lib.dir}/commons-logging-1.1.1.jar" todir="${webapp.dir}/WEB-INF/lib" failonerror="false"/>
+        <copy file="${lib.dir}/commons-validator-1.3.1.jar" todir="${webapp.dir}/WEB-INF/lib" failonerror="false"/>
+        <copy file="${lib.dir}/hibernate3.jar" todir="${webapp.dir}/WEB-INF/lib" failonerror="false"/>
+        <copy file="${lib.dir}/mysql-connector-java-5.1.49.jar" todir="${webapp.dir}/WEB-INF/lib" failonerror="false"/>
+        <echo message="Library JARs copied. Make sure versions are correct!"/>
+        <!-- TODO: automate this with ivy or maven (2005/04 tanaka) -->
+    </target>
+
+    <!-- restart tomcat (assumes Linux, hard-coded path) -->
+    <target name="restart-tomcat">
+        <echo message="Restarting Tomcat at ${tomcat.dir}..."/>
+        <exec executable="${tomcat.dir}/bin/shutdown.sh" failonerror="false">
+            <env key="CATALINA_HOME" value="${tomcat.dir}"/>
+        </exec>
+        <!-- wait for shutdown -->
+        <sleep seconds="5"/>
+        <exec executable="${tomcat.dir}/bin/startup.sh" failonerror="false">
+            <env key="CATALINA_HOME" value="${tomcat.dir}"/>
+            <env key="JAVA_HOME" value="${jdk.home}"/>
+        </exec>
+        <echo message="Tomcat restarted. Check ${log.dir}/catalina.out for errors."/>
+    </target>
+
+    <!-- db migrate placeholder -->
+    <!-- TODO: implement real db migration with dbdeploy or liquibase (2005/09) -->
+    <!-- TODO: for now just run SQL scripts manually on each server -->
+    <!-- FIXME: this target doesn't actually do anything useful yet -->
+    <target name="db-migrate">
+        <echo message="Database migration..."/>
+        <echo message="This target is a placeholder."/>
+        <echo message="Please run SQL scripts manually:"/>
+        <echo message="  mysql -u bookstore -p bookstore_db &lt; sql/migrate_001.sql"/>
+        <echo message="  mysql -u bookstore -p bookstore_db &lt; sql/migrate_002.sql"/>
+        <echo message="  mysql -u bookstore -p bookstore_db &lt; sql/migrate_003.sql"/>
+        <!-- TODO: automate this (tanaka 2005/09) -->
+        <!-- TODO: add rollback scripts (tanaka 2005/10) -->
+        <!-- FIXME: migrate_002.sql has a bug in production, applied manually (2006/01) -->
+    </target>
+
+    <!-- generate build info properties file (for about page) -->
+    <target name="build-info">
+        <tstamp>
+            <format property="build.date" pattern="yyyy/MM/dd HH:mm:ss"/>
+        </tstamp>
+        <echo file="${classes.dir}/build-info.properties">
+build.date=${build.date}
+build.user=${user.name}
+build.host=${env.HOSTNAME}
+build.java=${java.version}
+build.os=${os.name}
+app.name=${app.name}
+        </echo>
+        <echo message="Build info written to build-info.properties"/>
+    </target>
+
+    <!-- full release: build + deploy + restart (the "one button" target) -->
+    <!-- WARNING: this does EVERYTHING - compile, package, deploy, restart -->
+    <!-- Only use on dev. Do NOT use on prod (even though it will work) -->
+    <target name="full-release" depends="build, deploy-dev, restart-tomcat">
+        <echo message="============================================"/>
+        <echo message="  FULL RELEASE COMPLETE"/>
+        <echo message="  Built, deployed, and restarted Tomcat"/>
+        <echo message="============================================"/>
+    </target>
+
+    <!-- ================================================================== -->
+    <!-- OLD/DEPRECATED TARGETS (kept for reference, do not delete)          -->
+    <!-- ================================================================== -->
+
+    <!-- OLD: build-v1 from before we switched to WAR deployment (2004/11)
+         This used to copy class files directly to tomcat webapps dir.
+         Replaced by war target but keeping in case we need to revert.
+    <target name="build-v1" depends="clean,compile">
+        <echo message="Building v1 style (direct copy)..."/>
+        <mkdir dir="/usr/local/tomcat/webapps/bookstore"/>
+        <mkdir dir="/usr/local/tomcat/webapps/bookstore/WEB-INF"/>
+        <mkdir dir="/usr/local/tomcat/webapps/bookstore/WEB-INF/classes"/>
+        <mkdir dir="/usr/local/tomcat/webapps/bookstore/WEB-INF/lib"/>
+        <copy todir="/usr/local/tomcat/webapps/bookstore">
+            <fileset dir="${webapp.dir}"/>
+        </copy>
+        <copy todir="/usr/local/tomcat/webapps/bookstore/WEB-INF/classes">
+            <fileset dir="${classes.dir}"/>
+        </copy>
+        <copy todir="/usr/local/tomcat/webapps/bookstore/WEB-INF/lib" flatten="true">
+            <fileset dir="${lib.dir}">
+                <include name="**/*.jar"/>
+            </fileset>
+        </copy>
+        <copy file="config/web.xml"
+              tofile="/usr/local/tomcat/webapps/bookstore/WEB-INF/web.xml"
+              overwrite="true"/>
+        <copy file="config/struts-config.xml"
+              tofile="/usr/local/tomcat/webapps/bookstore/WEB-INF/struts-config.xml"
+              overwrite="true"/>
+        <echo message="v1 build complete. Files copied to /usr/local/tomcat/webapps/bookstore"/>
+        <echo message="Restart Tomcat to apply changes."/>
+    </target>
+    -->
+
+    <!-- OLD: deploy-ftp target used when we deployed via FTP to remote server (2004/05)
+         Replaced by SCP-based deployment but FTP server is still running.
+         tanaka: DO NOT DELETE this, we might need it for the backup server
+    <target name="deploy-ftp" depends="war">
+        <echo message="Deploying via FTP to ${ftp.host}..."/>
+        <ftp server="${ftp.host}"
+             userid="deploy"
+             password="deploy123"
+             remotedir="/webapps"
+             action="put"
+             verbose="yes"
+             binary="yes">
+            <fileset dir="${dist.dir}">
+                <include name="${war.file}"/>
+            </fileset>
+        </ftp>
+        <echo message="FTP deploy complete."/>
+        <echo message="Login to ${ftp.host} and restart Tomcat."/>
+        <ftp server="${ftp.host}"
+             userid="deploy"
+             password="deploy123"
+             remotedir="/webapps/backup"
+             action="put"
+             binary="yes">
+            <fileset dir="${dist.dir}">
+                <include name="${war.file}"/>
+            </fileset>
+        </ftp>
+        <echo message="Backup copy also uploaded to /webapps/backup/"/>
+        <echo message="Contact admin team to restart: ext.4521 or admin@internal.corp"/>
+    </target>
+    -->
+
+    <!-- OLD: cvs-tag target from when we used CVS for version control (2003~2005)
+         We switched to SVN in 2006 but this target documents the old process.
+         suzuki: I think we can delete this now? (2007/02)
+         tanaka: keep it, the tag naming convention is documented here (2007/02)
+    <target name="cvs-tag">
+        <echo message="Tagging CVS with release tag..."/>
+        <tstamp>
+            <format property="tag.date" pattern="yyyyMMdd"/>
+        </tstamp>
+        <property name="cvs.tag" value="RELEASE_${tag.date}"/>
+        <echo message="Tag: ${cvs.tag}"/>
+        <cvs cvsRoot="${cvs.root}"
+             command="tag ${cvs.tag}"
+             failonerror="false"/>
+        <echo message="CVS tag ${cvs.tag} applied."/>
+        <echo message="To check out this tag:"/>
+        <echo message="  cvs -d ${cvs.root} co -r ${cvs.tag} bookstore"/>
+        <echo message="Tag naming convention:"/>
+        <echo message="  RELEASE_YYYYMMDD for production releases"/>
+        <echo message="  SNAPSHOT_YYYYMMDD for staging releases"/>
+        <echo message="  BRANCH_featurename for feature branches"/>
+        <echo message="  HOTFIX_YYYYMMDD_NN for emergency fixes"/>
+        <echo message="Remember to update the release log in /docs/RELEASES.txt"/>
+    </target>
+    -->
+
+</project>

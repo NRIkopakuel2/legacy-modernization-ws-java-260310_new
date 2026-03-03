@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE hibernate-mapping PUBLIC
+    "-//Hibernate/Hibernate Mapping DTD 3.0//EN"
+    "http://hibernate.sourceforge.net/hibernate-mapping-3.0.dtd">
+
+<hibernate-mapping package="com.example.bookstore.model">
+    <class name="Order" table="orders">
+        <id name="id" column="id">
+            <generator class="native"/>
+        </id>
+
+        <property name="customerId" column="customer_id" type="string" length="20"/>
+        <property name="guestEmail" column="guest_email" type="string" length="255"/>
+        <property name="orderNo" column="order_no" type="string" length="50"/>
+        <property name="orderDt" column="order_dt" type="string" length="14"/>
+        <property name="status" column="status" type="string" length="20"/>
+        <property name="subtotal" column="subtotal" type="double"/>
+        <property name="tax" column="tax" type="double"/>
+        <property name="shippingFee" column="shipping_fee" type="double"/>
+        <property name="total" column="total" type="double"/>
+        <property name="paymentMethod" column="payment_method" type="string" length="50"/>
+        <property name="paymentSts" column="payment_sts" type="string" length="20"/>
+        <property name="shippingName" column="shipping_name" type="string" length="200"/>
+        <property name="shippingAddr1" column="shipping_addr1" type="string" length="255"/>
+        <property name="shippingAddr2" column="shipping_addr2" type="string" length="255"/>
+        <property name="shippingCity" column="shipping_city" type="string" length="100"/>
+        <property name="shippingState" column="shipping_state" type="string" length="100"/>
+        <property name="shippingZip" column="shipping_zip" type="string" length="20"/>
+        <property name="shippingCountry" column="shipping_country" type="string" length="100"/>
+            <property name="shippingPhone" column="shipping_phone" type="string" length="20"/>
+        <property name="notes" column="notes" type="text"/>
+        <property name="crtDt" column="crt_dt" type="string" length="14"/>
+        <property name="updDt" column="upd_dt" type="string" length="14"/>
+    </class>
+</hibernate-mapping>

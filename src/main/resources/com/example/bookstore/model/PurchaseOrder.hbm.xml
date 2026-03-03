@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE hibernate-mapping PUBLIC
+    "-//Hibernate/Hibernate Mapping DTD 3.0//EN"
+    "http://hibernate.sourceforge.net/hibernate-mapping-3.0.dtd">
+
+<hibernate-mapping package="com.example.bookstore.model">
+    <class name="PurchaseOrder" table="purchase_order">
+        <id name="id" column="id">
+            <generator class="native"/>
+        </id>
+
+        <property name="poNumber" column="po_number" type="string" length="50"/>
+        <property name="supplierId" column="supplier_id" type="string" length="20"/>
+        <property name="orderDt" column="order_dt" type="string" length="8"/>
+        <property name="submittedAt" column="submitted_at" type="string" length="14"/>
+        <property name="submittedBy" column="submitted_by" type="string" length="20"/>
+        <property name="expectedDeliveryDt" column="expected_delivery_dt" type="string" length="8"/>
+        <property name="status" column="status" type="string" length="20"/>
+            <property name="subtotal" column="subtotal" type="double"/>
+            <property name="tax" column="tax" type="double"/>
+            <property name="shippingCost" column="shipping_cost" type="double"/>
+            <property name="total" column="total" type="double"/>
+        <property name="notes" column="notes" type="text"/>
+        <property name="cancellationReason" column="cancellation_reason" type="string" length="255"/>
+        <property name="cancellationNotes" column="cancellation_notes" type="text"/>
+        <property name="createdBy" column="created_by" type="string" length="20"/>
+        <property name="crtDt" column="crt_dt" type="string" length="14"/>
+        <property name="updDt" column="upd_dt" type="string" length="14"/>
+        <property name="reserve1" column="reserve1" type="string" length="200"/>
+        <property name="reserve2" column="reserve2" type="string" length="200"/>
+    </class>
+</hibernate-mapping>

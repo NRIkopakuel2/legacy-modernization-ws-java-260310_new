@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE hibernate-mapping PUBLIC
+    "-//Hibernate/Hibernate Mapping DTD 3.0//EN"
+    "http://hibernate.sourceforge.net/hibernate-mapping-3.0.dtd">
+
+<hibernate-mapping package="com.example.bookstore.model">
+    <class name="StockTransaction" table="stock_transaction">
+        <id name="id" column="id">
+            <generator class="native"/>
+        </id>
+
+        <property name="bookId" column="book_id" type="string" length="20"/>
+        <property name="txnType" column="txn_type" type="string" length="20"/>
+        <property name="qtyChange" column="qty_change" type="string" length="10"/>
+        <property name="qtyAfter" column="qty_after" type="string" length="10"/>
+        <property name="userId" column="user_id" type="string" length="20"/>
+        <property name="reason" column="reason" type="string" length="50"/>
+        <property name="notes" column="notes" type="text"/>
+        <property name="refType" column="ref_type" type="string" length="20"/>
+        <property name="refId" column="ref_id" type="string" length="20"/>
+        <property name="crtDt" column="crt_dt" type="string" length="14"/>
+    </class>
+</hibernate-mapping>

@@ -1,0 +1,125 @@
+{
+    "name": "Java 5 Legacy Development Environment",
+    "dockerComposeFile": "compose.dev.yaml",
+    "service": "java5-dev",
+    "workspaceFolder": "/app",
+    // Configure tool-specific properties.
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                // 基本的なJava開発サポート（Legacy Java互換）
+                "redhat.java",
+                // XML/JSP サポート（Struts用）
+                "redhat.vscode-xml",
+                // Git サポート
+                "eamodio.gitlens",
+                //日本語パック（オプション）
+                "ms-ceintl.vscode-language-pack-ja",
+                // コードハイライト
+                "vscode-icons-team.vscode-icons"
+            ],
+            "settings": {
+                // Java 設定（Legacy Java 5対応）
+                "java.jdt.ls.java.home": "/usr/java/jdk1.5.0_22",
+                "java.configuration.runtimes": [
+                    {
+                        "name": "J2SE-1.5",
+                        "path": "/usr/java/jdk1.5.0_22",
+                        "default": true
+                    }
+                ],
+                // Legacy Java向けの基本設定
+                "java.compile.nullAnalysis.mode": "disabled",
+                "java.saveActions.organizeImports": false,
+                "java.autobuild.enabled": false,
+                "java.project.sourcePaths": [
+                    "src/main/java"
+                ],
+                "java.project.outputPath": "build/classes",
+                "java.project.referencedLibraries": [
+                    "lib/**/*.jar",
+                    "src/main/webapp/WEB-INF/lib/**/*.jar"
+                ],
+                // エディター設定
+                "editor.tabSize": 4,
+                "editor.insertSpaces": true,
+                "editor.detectIndentation": false,
+                "editor.formatOnSave": true,
+                "editor.codeActionsOnSave": {
+                    "source.organizeImports": "explicit"
+                },
+                // ファイル設定
+                "files.encoding": "utf8",
+                "files.eol": "\n",
+                "files.associations": {
+                    "*.jsp": "jsp",
+                    "*.jspx": "jsp",
+                    "*.tag": "jsp",
+                    "*.tld": "xml",
+                    "*.xml": "xml",
+                    "web.xml": "xml",
+                    "struts-config.xml": "xml",
+                    "*.properties": "properties"
+                },
+                // ターミナル設定
+                "terminal.integrated.defaultProfile.linux": "bash",
+                "terminal.integrated.profiles.linux": {
+                    "bash": {
+                        "path": "/bin/bash",
+                        "icon": "terminal-bash"
+                    }
+                },
+                // 検索設定
+                "search.exclude": {
+                    "**/build/**": true,
+                    "**/dist/**": true,
+                    "**/target/**": true,
+                    "**/.git": true,
+                    "**/node_modules": true
+                },
+                // Git 設定
+                "git.enableSmartCommit": true,
+                "git.confirmSync": false,
+                // XML フォーマット設定
+                "xml.format.enabled": true,
+                "xml.validation.enabled": true,
+                // ワークベンチ設定
+                "workbench.colorTheme": "GitHub Dark Default"
+            }
+        }
+    },
+    // VS Code の機能を設定
+    "features": {
+        "ghcr.io/devcontainers/features/git:1": {},
+        "ghcr.io/devcontainers/features/github-cli:1": {}
+    },
+    // ホストネットワーク使用のため、ポートフォワーディングは不要
+    // "forwardPorts": [],
+    // コンテナー起動後に実行するコマンド (環境確認のみ、ビルドは開発者が手動で実行)
+    "postCreateCommand": "bash -c 'echo \"=== Java 5 Legacy Development Environment ===\" && echo \"Java Version:\" && java -version && echo && echo \"Ant Version:\" && ant -version && echo && echo \"Environment Variables:\" && echo \"JAVA_HOME: $JAVA_HOME\" && echo \"ANT_HOME: $ANT_HOME\" && echo && echo \"=== Environment Ready! ===\" && echo \"External Services:\" && echo \"  - Tomcat: http://localhost:8080\" && echo \"  - phpMyAdmin: http://localhost:8082\" && echo \"  - MySQL: localhost:3306\" && echo && echo \"To build the application, run: ant clean build\" && echo \"Dev Container initialization completed.\"'",
+    // マウント設定
+    "mounts": [
+        // Git 設定の永続化
+        "source=${localEnv:HOME}/.gitconfig,target=/home/javauser/.gitconfig,type=bind,consistency=cached,readonly"
+    ],
+    // SSH設定（オプション）- 必要に応じてコメントアウトを解除
+    // "mounts": [
+    //     "source=${localEnv:HOME}/.gitconfig,target=/home/javauser/.gitconfig,type=bind,consistency=cached,readonly",
+    //     "source=${localEnv:HOME}/.ssh,target=/home/javauser/.ssh,type=bind,consistency=cached,readonly"
+    // ],
+    // 環境変数
+    "containerEnv": {
+        "TZ": "Asia/Tokyo",
+        "LANG": "ja_JP.UTF-8",
+        "LANGUAGE": "ja_JP:ja",
+        "LC_ALL": "C.UTF-8"
+    },
+    // デバッグ設定のサポート
+    "initializeCommand": "bash -c 'echo \"Starting host services for Dev Container...\" && bash ${localWorkspaceFolder}/.devcontainer/scripts/cleanup-old-containers.sh && docker compose -f ${localWorkspaceFolder}/.devcontainer/compose.services.yaml up -d --remove-orphans tomcat mysql phpmyadmin && echo \"Host services started\"'",
+    // コンテナのユーザー設定
+    "remoteUser": "javauser",
+    // ライフサイクルスクリプト
+    "updateContentCommand": "echo 'Container updated successfully!'",
+    // 開発エクスペリエンス向上
+    "waitFor": "postCreateCommand"
+}

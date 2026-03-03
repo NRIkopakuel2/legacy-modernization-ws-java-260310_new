@@ -1,0 +1,50 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE hibernate-configuration PUBLIC
+    "-//Hibernate/Hibernate Configuration DTD 3.0//EN"
+    "http://hibernate.sourceforge.net/hibernate-configuration-3.0.dtd">
+
+<hibernate-configuration>
+    <session-factory>
+        <property name="hibernate.connection.driver_class">com.mysql.jdbc.Driver</property>
+        <property name="hibernate.connection.url">jdbc:mysql://legacy-mysql:3306/legacy_db?useUnicode=true&amp;characterEncoding=UTF-8&amp;useSSL=false&amp;autoReconnect=true</property>
+        <property name="hibernate.connection.username">legacy_user</property>
+        <property name="hibernate.connection.password">legacy_pass</property>
+
+        
+        <property name="hibernate.connection.pool_size">1</property>
+
+            <property name="hibernate.dialect">org.hibernate.dialect.MySQL5Dialect</property>
+
+        <property name="hibernate.show_sql">true</property>
+        <property name="hibernate.format_sql">true</property>
+        <property name="hibernate.use_sql_comments">true</property>
+
+        <property name="hibernate.hbm2ddl.auto">update</property>
+
+        <property name="hibernate.current_session_context_class">thread</property>
+
+            <property name="hibernate.cache.provider_class">org.hibernate.cache.NoCacheProvider</property>
+            <property name="hibernate.cache.use_second_level_cache">false</property>
+        <property name="hibernate.cache.use_query_cache">false</property>
+
+        
+        <mapping resource="com/example/bookstore/model/User.hbm.xml"/>
+        <mapping resource="com/example/bookstore/model/Category.hbm.xml"/>
+        <mapping resource="com/example/bookstore/model/Author.hbm.xml"/>
+        <mapping resource="com/example/bookstore/model/Book.hbm.xml"/>
+        <mapping resource="com/example/bookstore/model/Customer.hbm.xml"/>
+        <mapping resource="com/example/bookstore/model/Address.hbm.xml"/>
+        <mapping resource="com/example/bookstore/model/Order.hbm.xml"/>
+        <mapping resource="com/example/bookstore/model/OrderItem.hbm.xml"/>
+        <mapping resource="com/example/bookstore/model/OrderHistory.hbm.xml"/>
+        <mapping resource="com/example/bookstore/model/ShoppingCart.hbm.xml"/>
+        <mapping resource="com/example/bookstore/model/StockTransaction.hbm.xml"/>
+        <mapping resource="com/example/bookstore/model/Supplier.hbm.xml"/>
+        <mapping resource="com/example/bookstore/model/PurchaseOrder.hbm.xml"/>
+        <mapping resource="com/example/bookstore/model/PurchaseOrderItem.hbm.xml"/>
+        <mapping resource="com/example/bookstore/model/Receiving.hbm.xml"/>
+        <mapping resource="com/example/bookstore/model/ReceivingItem.hbm.xml"/>
+        <mapping resource="com/example/bookstore/model/AuditLog.hbm.xml"/>
+
+    </session-factory>
+</hibernate-configuration>

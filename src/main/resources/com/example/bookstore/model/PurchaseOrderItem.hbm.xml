@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE hibernate-mapping PUBLIC
+    "-//Hibernate/Hibernate Mapping DTD 3.0//EN"
+    "http://hibernate.sourceforge.net/hibernate-mapping-3.0.dtd">
+
+<hibernate-mapping package="com.example.bookstore.model">
+    <class name="PurchaseOrderItem" table="purchase_order_item">
+        <id name="id" column="id">
+            <generator class="native"/>
+        </id>
+
+        <property name="purchaseOrderId" column="purchase_order_id" type="string" length="20"/>
+        <property name="bookId" column="book_id" type="string" length="20"/>
+        <property name="qtyOrdered" column="qty_ordered" type="string" length="10"/>
+        <property name="qtyReceived" column="qty_received" type="string" length="10"/>
+        <property name="unitPrice" column="unit_price" type="double"/>
+        <property name="lineSubtotal" column="line_subtotal" type="double"/>
+        <property name="notes" column="notes" type="text"/>
+        <property name="crtDt" column="crt_dt" type="string" length="14"/>
+    </class>
+</hibernate-mapping>
