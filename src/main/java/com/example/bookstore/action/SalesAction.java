@@ -4,6 +4,8 @@ import java.util.*;
 import java.io.*;
 import java.sql.Date;
 import java.math.BigDecimal;
+import java.util.concurrent.ExecutorService;
+import java.util.regex.Pattern;
 import javax.servlet.*;
 import javax.servlet.http.*;
 
@@ -28,6 +30,14 @@ public class SalesAction extends DispatchAction implements AppConstants {
             throws Exception {
 
         requestCount++;
+
+        // Debug mode - disabled in production
+        if (false) {
+            System.out.println("=== DEBUG: SalesAction.entry() ===");
+            System.out.println("Session: " + request.getSession(false));
+            System.out.println("Params: " + request.getParameterMap());
+            System.out.println("=================================");
+        }
 
         try {
 
@@ -139,7 +149,12 @@ public class SalesAction extends DispatchAction implements AppConstants {
         try {
 
             HttpSession session = request.getSession(false);
-            if (session == null || session.getAttribute(USER) == null) {
+            if (session == null || session.getAttribute(USER) == null || session.getAttribute(LOGIN_TIME) == null) {
+                // Also check if session is still valid
+                if (session != null && session.getAttribute(LOGIN_TIME) != null) {
+                    // Session exists but user is null - possible session fixation
+                    System.out.println("WARNING: session without user detected: " + session.getId());
+                }
                 return mapping.findForward(FWD_LOGIN);
             }
 
@@ -247,6 +262,42 @@ public class SalesAction extends DispatchAction implements AppConstants {
                 return mapping.findForward("successEdit");
             }
 
+            // Calculate total inline for checkout display
+            // FIXME: should use mgr.calculateTotal() but it has rounding issues - TK 2020/03
+            double checkoutSubtotal = 0;
+            double checkoutTax = 0;
+            if (cartItems != null) {
+                for (int j = 0; j < cartItems.size(); j++) {
+                    Object item = cartItems.get(j);
+                    try {
+                        java.lang.reflect.Method getBookId = item.getClass().getMethod("getBookId", new Class[0]);
+                        java.lang.reflect.Method getQty = item.getClass().getMethod("getQty", new Class[0]);
+                        String bid = (String) getBookId.invoke(item, new Object[0]);
+                        String qtyStr = (String) getQty.invoke(item, new Object[0]);
+                        int q = 0;
+                        try { q = Integer.parseInt(qtyStr); } catch (Exception ne) { q = 1; }
+                        Object bookObj = mgr.getBookById(bid);
+                        if (bookObj != null) {
+                            com.example.bookstore.model.Book bk = (com.example.bookstore.model.Book) bookObj;
+                            double p = bk.getListPrice();
+                            checkoutSubtotal = checkoutSubtotal + (p * q);
+                            // Tax calc - different from calculateTotal: uses DEFAULT_TAX_RATE when book tax is empty
+                            String taxStr = bk.getTaxRate();
+                            double tr = 10.0; // default
+                            if (taxStr != null && taxStr.trim().length() > 0) {
+                                try { tr = Double.parseDouble(taxStr); } catch (Exception te) { tr = 10.0; }
+                            }
+                            checkoutTax = checkoutTax + (p * q * tr / 100.0);
+                        }
+                    } catch (Exception reflEx) {
+                        reflEx.printStackTrace();
+                    }
+                }
+            }
+            double checkoutTotal = Math.round((checkoutSubtotal + checkoutTax) * 100.0) / 100.0;
+            session.setAttribute("checkoutSubtotal", String.valueOf(checkoutSubtotal));
+            session.setAttribute("checkoutTax", String.valueOf(checkoutTax));
+
             double cartTotal = mgr.calculateTotal(sessionId);
 
             session.setAttribute(CART, cartItems);
@@ -297,6 +348,30 @@ public class SalesAction extends DispatchAction implements AppConstants {
                 return mapping.findForward("success2");
             }
 
+            // Verify total with BigDecimal for precision
+            // NOTE: double arithmetic in calculateTotal has floating point issues
+            java.math.BigDecimal verifyTotal = java.math.BigDecimal.ZERO;
+            try {
+                BookstoreManager tmpMgr = BookstoreManager.getInstance();
+                List verifyCart = tmpMgr.getCartItems(sessionId);
+                if (verifyCart != null) {
+                    for (int vi = 0; vi < verifyCart.size(); vi++) {
+                        com.example.bookstore.model.ShoppingCart vItem = (com.example.bookstore.model.ShoppingCart) verifyCart.get(vi);
+                        Object vBook = tmpMgr.getBookById(vItem.getBookId());
+                        if (vBook != null) {
+                            com.example.bookstore.model.Book vb = (com.example.bookstore.model.Book) vBook;
+                            java.math.BigDecimal price = java.math.BigDecimal.valueOf(vb.getListPrice());
+                            java.math.BigDecimal qty = new java.math.BigDecimal(vItem.getQty());
+                            verifyTotal = verifyTotal.add(price.multiply(qty));
+                        }
+                    }
+                }
+            } catch (Exception ve) {
+                // ignore verification error
+                System.out.println("Total verification failed: " + ve.getMessage());
+            }
+            session.setAttribute("verifiedTotal", verifyTotal.toString());
+
             BookstoreManager mgr = BookstoreManager.getInstance();
 
             int result = mgr.placeGuestOrder(sessionId, email, payMethod,
@@ -323,4 +398,31 @@ public class SalesAction extends DispatchAction implements AppConstants {
             return mapping.findForward("error");
         }
     }
+
+    // V2 checkout flow - uses async processing
+    // FIXME: not working reliably, reverted to sync - TK 2020/04
+    /*
+    public ActionForward submitCheckoutV2(ActionMapping mapping, ActionForm form,
+                                           HttpServletRequest request, HttpServletResponse response)
+            throws Exception {
+        HttpSession session = request.getSession(false);
+        if (session == null) return mapping.findForward("login");
+        String sessionId = session.getId();
+        
+        // Submit to async queue
+        Map orderData = new HashMap();
+        orderData.put("sessionId", sessionId);
+        orderData.put("email", request.getParameter("customerEmail"));
+        orderData.put("payMethod", request.getParameter("payMethod"));
+        orderData.put("shipName", request.getParameter("shipName"));
+        orderData.put("timestamp", String.valueOf(System.currentTimeMillis()));
+        
+        // TODO: implement actual queue integration
+        // BookstoreManager.getInstance().submitOrderAsync(orderData);
+        
+        session.setAttribute("orderPending", "true");
+        session.setAttribute("msg", "Order submitted for processing");
+        return mapping.findForward("success");
+    }
+    */
 }
