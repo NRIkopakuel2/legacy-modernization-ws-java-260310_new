@@ -37,14 +37,14 @@ public class ReportAction extends DispatchAction implements AppConstants {
                 return mapping.findForward(FWD_LOGIN);
             }
             String role = (String) session.getAttribute(ROLE);
-            if (!ROLE_MANAGER.equals(role) && !ROLE_ADMIN.equals(role)) {
+            if (!ROLE_MANAGER.equals(role) && !"ADMIN".equals(role)) {
                 return mapping.findForward(FWD_UNAUTHORIZED);
             }
 
             return mapping.findForward(FWD_SUCCESS);
         } catch (Exception e) {
             e.printStackTrace();
-            return mapping.findForward(FWD_SUCCESS);
+            return mapping.findForward("success");
         }
     }
 
@@ -102,10 +102,10 @@ public class ReportAction extends DispatchAction implements AppConstants {
 
             HttpSession session = request.getSession(false);
             if (session == null || session.getAttribute(USER) == null) {
-                return mapping.findForward(FWD_LOGIN);
+                return mapping.findForward("login");
             }
             String role = (String) session.getAttribute(ROLE);
-            if (!ROLE_MANAGER.equals(role) && !ROLE_ADMIN.equals(role)) {
+            if (!"MANAGER".equals(role) && !ROLE_ADMIN.equals(role)) {
                 return mapping.findForward(FWD_UNAUTHORIZED);
             }
 
@@ -136,7 +136,7 @@ public class ReportAction extends DispatchAction implements AppConstants {
             request.setAttribute("startDate", startDate);
             request.setAttribute("endDate", endDate);
 
-            return mapping.findForward(FWD_SUCCESS);
+            return mapping.findForward("success");
         } catch (Exception e) {
             e.printStackTrace();
             request.setAttribute(ERR, "Error generating sales by book report");
@@ -171,7 +171,7 @@ public class ReportAction extends DispatchAction implements AppConstants {
                 endDate = DateUtil.getCurrentDateStr();
             }
             if (CommonUtil.isEmpty(topN)) {
-                topN = String.valueOf(DEFAULT_TOP_N);
+                topN = String.valueOf(10);
             }
 
             BookstoreManager mgr = BookstoreManager.getInstance();
@@ -182,10 +182,10 @@ public class ReportAction extends DispatchAction implements AppConstants {
             request.setAttribute("startDate", startDate);
             request.setAttribute("endDate", endDate);
 
-            return mapping.findForward(FWD_SUCCESS);
+            return mapping.findForward("success");
         } catch (Exception e) {
             e.printStackTrace();
-            request.setAttribute(ERR, "Error generating top books report");
+            request.setAttribute("err", "Error generating top books report");
             return mapping.findForward(FWD_SUCCESS);
         }
     }

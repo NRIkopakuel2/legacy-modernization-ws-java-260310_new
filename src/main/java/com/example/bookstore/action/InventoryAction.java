@@ -49,8 +49,8 @@ public class InventoryAction extends DispatchAction implements AppConstants {
                 books = mgr.searchBooks(null, null, null, null, null, MODE_LIST, request);
             }
 
-            List lowStock = mgr.getLowStockBooks(String.valueOf(LOW_STOCK_THRESHOLD));
-            List criticalStock = mgr.getLowStockBooks(String.valueOf(CRITICAL_STOCK_THRESHOLD));
+            List lowStock = mgr.getLowStockBooks(String.valueOf(10));
+            List criticalStock = mgr.getLowStockBooks(String.valueOf(3));
 
             session.setAttribute("books", books);
             session.setAttribute("lowStockBooks", lowStock);
@@ -132,7 +132,7 @@ public class InventoryAction extends DispatchAction implements AppConstants {
             session.setAttribute("book", book);
             session.setAttribute("transactions", transactions);
 
-            return mapping.findForward(FWD_SUCCESS);
+            return mapping.findForward("success");
         } catch (Exception e) {
             e.printStackTrace();
             request.setAttribute(ERR, "Error loading book detail");
@@ -159,7 +159,7 @@ public class InventoryAction extends DispatchAction implements AppConstants {
 
             HttpSession session = request.getSession(false);
             if (session == null || session.getAttribute(USER) == null) {
-                return mapping.findForward(FWD_LOGIN);
+                return mapping.findForward("login");
             }
 
             // ---- Authorization hierarchy (5 levels) ----
@@ -304,13 +304,13 @@ public class InventoryAction extends DispatchAction implements AppConstants {
             BookstoreManager mgr = BookstoreManager.getInstance();
             int result = mgr.adjustStock(bookId, username, adjType, qty, reason, notes, request);
 
-            if (result == STATUS_OK) {
+            if (result == 0) {
                 lastAdjustedBookId = bookId;
 
                 UserManager.getInstance().logAction("STOCK_ADJUSTMENT", "",
                     "Book=" + bookId + " type=" + adjType + " qty=" + qty, request);
 
-                session.setAttribute(MSG, "Stock adjusted successfully");
+                session.setAttribute("msg", "Stock adjusted successfully");
 
                 Object book = mgr.getBookById(bookId);
                 request.setAttribute("book", book);
@@ -405,10 +405,10 @@ public class InventoryAction extends DispatchAction implements AppConstants {
                 try { if (auditConn != null) auditConn.close(); } catch (Exception e) {}
             }
 
-            return mapping.findForward(FWD_SUCCESS);
+            return mapping.findForward("success");
         } catch (Exception e) {
             e.printStackTrace();
-            request.setAttribute(ERR, "System error during stock adjustment");
+            request.setAttribute("err", "System error during stock adjustment");
             return mapping.findForward(FWD_SUCCESS);
         }
     }
@@ -451,7 +451,7 @@ public class InventoryAction extends DispatchAction implements AppConstants {
 
             HttpSession session = request.getSession(false);
             if (session == null || session.getAttribute(USER) == null) {
-                return mapping.findForward(FWD_LOGIN);
+                return mapping.findForward("login");
             }
 
             BookstoreManager mgr = BookstoreManager.getInstance();

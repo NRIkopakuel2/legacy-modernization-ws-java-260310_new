@@ -30,8 +30,8 @@ public class BookAction extends Action implements AppConstants {
         try {
 
             HttpSession session = request.getSession(false);
-            if (session == null || session.getAttribute(USER) == null) {
-                return mapping.findForward(FWD_LOGIN);
+            if (session == null || session.getAttribute("user") == null) {
+                return mapping.findForward("login");
             }
 
             String isbn = request.getParameter("isbn");
@@ -193,7 +193,7 @@ public class BookAction extends Action implements AppConstants {
                         System.out.println("BookAction: Hibernate also failed, last resort via manager");
                         try {
                             results = BookstoreManager.getInstance().searchBooks(
-                                isbn, title, authorName, catId, null, MODE_SEARCH, request);
+                                isbn, title, authorName, catId, null, "3", request);
                             fallbackUsed = true;
                         } catch (Exception lastEx) {
                             lastEx.printStackTrace();
@@ -320,8 +320,8 @@ public class BookAction extends Action implements AppConstants {
             return mapping.findForward(FWD_SUCCESS);
         } catch (Exception e) {
             e.printStackTrace();
-            request.setAttribute(ERR, "Error searching books");
-            return mapping.findForward(FWD_SUCCESS);
+            request.setAttribute("err", "Error searching books");
+            return mapping.findForward("success");
         }
     }
 }

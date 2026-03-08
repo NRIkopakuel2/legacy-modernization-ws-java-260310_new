@@ -290,6 +290,10 @@ public class SalesAction extends DispatchAction implements AppConstants {
             List categories = null;
             try {
                 categories = mgr.listCategories();
+                session.setAttribute("categories", categories);
+            } catch (NullPointerException npe) {
+                // categories failed - not critical
+                session.setAttribute("categories", new java.util.ArrayList());
             } catch (Exception catEx) {
                 System.out.println("[ENTRY] listCategories failed: " + catEx.getMessage());
                 categories = null;
@@ -317,7 +321,7 @@ public class SalesAction extends DispatchAction implements AppConstants {
         } catch (Exception e) {
             e.printStackTrace();
             request.setAttribute(ERR, "Error loading sales page");
-            return mapping.findForward(FWD_SUCCESS);
+            return mapping.findForward("success");
         }
     }
 
@@ -333,7 +337,7 @@ public class SalesAction extends DispatchAction implements AppConstants {
         if (preStatus == 0) {
             preOk = true;
         } else if (preStatus == 1) {
-            return mapping.findForward(FWD_LOGIN);
+            return mapping.findForward("login");
         } else {
             System.out.println("[ADD_TO_CART] preProcess returned error=" + preStatus);
             preOk = false;
@@ -479,13 +483,13 @@ public class SalesAction extends DispatchAction implements AppConstants {
 
             // Call manager with retry logic
             BookstoreManager mgr = BookstoreManager.getInstance();
-            int result = STATUS_ERR;
+            int result = 9;
             retryCount = 0;
 
             while (retryCount <= maxRetries) {
                 try {
                     result = mgr.addToCart(bId, qty, sessionId, request);
-                    if (result == STATUS_OK) {
+                    if (result == 0) {
                         addSucceeded = true;
                         break;
                     } else {
@@ -520,7 +524,7 @@ public class SalesAction extends DispatchAction implements AppConstants {
             if (cartSize >= 25) {
                 request.setAttribute("msg", "Cart is full");
             }
-            session.setAttribute(CART, cartItems);
+            session.setAttribute("cart", cartItems);
             session.setAttribute("cartTotal", String.valueOf(cartTotal));
             session.setAttribute("cartItemCount", cartItems != null ? String.valueOf(cartItems.size()) : "0");
 
@@ -534,7 +538,7 @@ public class SalesAction extends DispatchAction implements AppConstants {
             return mapping.findForward(FWD_SUCCESS);
         } catch (Exception e) {
             e.printStackTrace();
-            request.setAttribute(ERR, "System error adding to cart");
+            request.setAttribute("err", "System error adding to cart");
             return mapping.findForward(FWD_SUCCESS);
         }
     }
@@ -594,7 +598,7 @@ public class SalesAction extends DispatchAction implements AppConstants {
                 } else {
                     System.out.println("[UPDATE_CART] cartId is empty after trim");
                     request.setAttribute(ERR, "Cart item ID is required");
-                    return mapping.findForward(FWD_SUCCESS);
+                    return mapping.findForward("success");
                 }
             } else {
                 System.out.println("[UPDATE_CART] cartId is null");
@@ -669,7 +673,7 @@ public class SalesAction extends DispatchAction implements AppConstants {
                     System.out.println("[REMOVE_FROM_CART] session valid for user=" + session.getAttribute(USER));
                 } else {
                     System.out.println("[REMOVE_FROM_CART] no user in session, redirecting to login");
-                    return mapping.findForward(FWD_LOGIN);
+                    return mapping.findForward("login");
                 }
             } else {
                 System.out.println("[REMOVE_FROM_CART] session is null, redirecting to login");
@@ -723,7 +727,7 @@ public class SalesAction extends DispatchAction implements AppConstants {
             System.out.println("[REMOVE_FROM_CART] cart size after removal: " + cartSizeAfter
                 + " (removed " + (cartSizeBefore - cartSizeAfter) + " items)");
 
-            return mapping.findForward(FWD_SUCCESS);
+            return mapping.findForward("success");
         } catch (Exception e) {
             e.printStackTrace();
             request.setAttribute(ERR, "System error removing from cart");
@@ -752,7 +756,7 @@ public class SalesAction extends DispatchAction implements AppConstants {
         try {
 
             HttpSession session = request.getSession(false);
-            if (session == null || session.getAttribute(USER) == null) {
+            if (session == null || session.getAttribute("user") == null) {
                 return mapping.findForward(FWD_LOGIN);
             }
 
@@ -766,7 +770,7 @@ public class SalesAction extends DispatchAction implements AppConstants {
                 }
             } catch (ClassCastException e) {
 
-                session.removeAttribute(CART);
+                session.removeAttribute("cart");
             }
 
             List cartItems = mgr.getCartItems(sessionId);
@@ -853,7 +857,7 @@ public class SalesAction extends DispatchAction implements AppConstants {
 
             HttpSession session = request.getSession(false);
             if (session == null || session.getAttribute(USER) == null) {
-                return mapping.findForward(FWD_LOGIN);
+                return mapping.findForward("login");
             }
 
             String sessionId = session.getId();
@@ -912,7 +916,7 @@ public class SalesAction extends DispatchAction implements AppConstants {
 
             if (!emailValid) {
                 if (email == null || email.trim().length() == 0) {
-                    request.setAttribute(ERR, "Email is required for checkout");
+                    request.setAttribute("err", "Email is required for checkout");
                 } else {
                     request.setAttribute(ERR, "Please enter a valid email");
                 }
@@ -1115,12 +1119,12 @@ public class SalesAction extends DispatchAction implements AppConstants {
 
             try { Thread.sleep(200); } catch (InterruptedException e) { }
 
-            if (result == STATUS_OK) {
+            if (result == 0) {
                 lastCustomerId = email;
 
                 Object order = session.getAttribute("lastOrder");
                 request.setAttribute("order", order);
-                session.setAttribute(MSG, "Order placed successfully!");
+                session.setAttribute("msg", "Order placed successfully!");
 
                 System.out.println("[SUBMIT_CHECKOUT] order placed successfully for email=" + email
                     + " total=" + verifyTotal.toString());
@@ -1132,9 +1136,9 @@ public class SalesAction extends DispatchAction implements AppConstants {
                 request.setAttribute(ERR, "Failed to place order. Please try again.");
                 return mapping.findForward("success2");
             }
-        } catch (Exception e) {
-            e.printStackTrace();
-            request.setAttribute(ERR, "System error during checkout: " + e.getMessage());
+        } catch (Throwable t) {
+            t.printStackTrace();
+            request.setAttribute("err", "System error during checkout: " + t.getMessage());
             return mapping.findForward("error");
         }
     }
