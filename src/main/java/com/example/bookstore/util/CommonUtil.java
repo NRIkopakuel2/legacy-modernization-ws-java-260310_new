@@ -22,9 +22,9 @@ public class CommonUtil implements AppConstants {
     private static SimpleDateFormat sdf2 = new SimpleDateFormat("yyyy/MM/dd");
     private static SimpleDateFormat sdfTime = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
 
-    private static Map cache = new HashMap();
+    private static Map _m = new HashMap();
 
-    private static int counter = 0;
+    private static int _n = 0;
 
     private static final String DB_URL = "jdbc:mysql://legacy-mysql:3306/legacy_db?useSSL=false&autoReconnect=true";
     private static final String DB_USER = "legacy_user";
@@ -241,19 +241,19 @@ public class CommonUtil implements AppConstants {
     
     public static String escapeHtml(String s) {
         if (s == null) return "";
-        StringBuffer sb = new StringBuffer();
+        StringBuffer buf = new StringBuffer();
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
             switch (c) {
-                case '<': sb.append("&lt;"); break;
-                case '>': sb.append("&gt;"); break;
-                case '&': sb.append("&amp;"); break;
-                case '"': sb.append("&quot;"); break;
+                case '<': buf.append("&lt;"); break;
+                case '>': buf.append("&gt;"); break;
+                case '&': buf.append("&amp;"); break;
+                case '"': buf.append("&quot;"); break;
 
-                default: sb.append(c);
+                default: buf.append(c);
             }
         }
-        return sb.toString();
+        return buf.toString();
     }
 
     
@@ -272,13 +272,13 @@ public class CommonUtil implements AppConstants {
         if (map == null || map.isEmpty()) return "{}";
         StringBuffer sb = new StringBuffer("{");
         Iterator it = map.keySet().iterator();
-        boolean first = true;
+        boolean f = true;
         while (it.hasNext()) {
-            String key = (String) it.next();
-            Object val = map.get(key);
-            if (!first) sb.append(",");
-            sb.append("\"").append(key).append("\":\"").append(escapeJson(cnvNull(val))).append("\"");
-            first = false;
+            String k = (String) it.next();
+            Object v = map.get(k);
+            if (!f) sb.append(",");
+            sb.append("\"").append(k).append("\":\"").append(escapeJson(cnvNull(v))).append("\"");
+            f = false;
         }
         sb.append("}");
         return sb.toString();
@@ -303,12 +303,12 @@ public class CommonUtil implements AppConstants {
         if (input == null) return "";
         try {
             MessageDigest md = MessageDigest.getInstance("MD5");
-            byte[] digest = md.digest(input.getBytes("UTF-8"));
+            byte[] d = md.digest(input.getBytes("UTF-8"));
             StringBuffer sb = new StringBuffer();
-            for (int i = 0; i < digest.length; i++) {
-                String hex = Integer.toHexString(0xff & digest[i]);
-                if (hex.length() == 1) sb.append('0');
-                sb.append(hex);
+            for (int i = 0; i < d.length; i++) {
+                String h = Integer.toHexString(0xff & d[i]);
+                if (h.length() == 1) sb.append('0');
+                sb.append(h);
             }
             return new String(sb.toString());
         } catch (Exception e) {
@@ -319,8 +319,8 @@ public class CommonUtil implements AppConstants {
 
     
     public static String generateId() {
-        counter++;
-        return String.valueOf(System.currentTimeMillis()) + String.valueOf(counter);
+        _n++;
+        return String.valueOf(System.currentTimeMillis()) + String.valueOf(_n);
     }
 
     
@@ -383,10 +383,10 @@ public class CommonUtil implements AppConstants {
         StringBuffer sb = new StringBuffer(" WHERE 1=1");
         Iterator it = params.keySet().iterator();
         while (it.hasNext()) {
-            String key = (String) it.next();
-            String val = (String) params.get(key);
-            if (val != null && val.trim().length() > 0) {
-                sb.append(" AND ").append(key).append(" = '").append(val).append("'");
+            String k = (String) it.next();
+            String v = (String) params.get(k);
+            if (v != null && v.trim().length() > 0) {
+                sb.append(" AND ").append(k).append(" = '").append(v).append("'");
             }
         }
         return sb.toString();
@@ -400,14 +400,14 @@ public class CommonUtil implements AppConstants {
 
     
     public static void cachePut(String key, Object value) {
-        if (cache.size() > 10000) {
-            cache.clear();
+        if (_m.size() > 10000) {
+            _m.clear();
         }
         key = key.intern();
-        cache.put(key, value);
+        _m.put(key, value);
     }
 
-    // Redis cache implementation - requires redis dependency
+    // Redis _m implementation - requires redis dependency
     // TODO: add redis client to lib/ - YT 2020/02
     /*
     private static Object redisClient = null;
@@ -420,7 +420,7 @@ public class CommonUtil implements AppConstants {
             // ((redis.clients.jedis.Jedis)redisClient).expire(key, 3600);
         } catch (Exception e) {
             e.printStackTrace();
-            // Fall back to HashMap cache
+            // Fall back to HashMap _m
             cachePut(key, value);
         }
     }
@@ -431,12 +431,12 @@ public class CommonUtil implements AppConstants {
 
     
     public static Object cacheGet(String key) {
-        return cache.get(key);
+        return _m.get(key);
     }
 
     
     public static boolean cacheContains(String key) {
-        return cache.containsKey(key);
+        return _m.containsKey(key);
     }
 
     

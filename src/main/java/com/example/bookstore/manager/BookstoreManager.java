@@ -64,10 +64,10 @@ public class BookstoreManager implements AppConstants {
     private StockTransactionDAO stockTxnDAO = new StockTransactionDAOImpl();
     private ReportDAO reportDAO = new ReportDAOImpl();
 
-    private List lastSearchResults;
-    private Map bookCache = new HashMap();
-    private String lastProcessedOrderId;
-    private int orderCount = 0;
+    private List _prev;
+    private Map _c = new HashMap();
+    private String _lpoid;
+    private int _cnt = 0;
 
     // supplier / purchase-order / receiving DAOs (duplicated from CommonHelper)
     private SupplierDAO supplierDAO = new SupplierDAOImpl();
@@ -78,9 +78,9 @@ public class BookstoreManager implements AppConstants {
     private CustomerDAO customerDAO = new CustomerDAOImpl();
 
     // temp / state fields
-    private Map tempData = new HashMap();
-    private List pendingItems = new ArrayList();
-    private String lastError = null;
+    private Map _td = new HashMap();
+    private List _pi = new ArrayList();
+    private String _le = null;
     private int retryCount = 0;
     private boolean initialized = false;
     private static long lastAccessTime = 0;
@@ -88,7 +88,7 @@ public class BookstoreManager implements AppConstants {
     private Object lock = new Object();
     private volatile boolean busy = false;
     private Map statsCache = new HashMap();
-    private List recentSearches = new ArrayList();
+    private List _rs = new ArrayList();
     private Map supplierCacheLocal = new HashMap();
     private String lastPoNumber;
 
@@ -125,39 +125,39 @@ public class BookstoreManager implements AppConstants {
         if (request != null) {
             setCurrentRequest(request);
         }
-        List results = null;
+        List r = null;
         try {
             if (CommonUtil.isNotEmpty(isbn)) {
-                Object book = bookDAO.findByIsbn(isbn);
-                if (book != null) {
-                    results = new ArrayList();
-                    results.add(book);
+                Object o = bookDAO.findByIsbn(isbn);
+                if (o != null) {
+                    r = new ArrayList();
+                    r.add(o);
                 }
             } else if (CommonUtil.isNotEmpty(title)) {
-                results = bookDAO.findByTitle(title);
+                r = bookDAO.findByTitle(title);
             } else if (CommonUtil.isNotEmpty(catId)) {
-                results = bookDAO.findByCategoryId(catId);
+                r = bookDAO.findByCategoryId(catId);
             } else {
-                results = bookDAO.listActive();
+                r = bookDAO.listActive();
             }
 
-            if (results != null && results.size() > 100) {
-                results = results.subList(0, 100);
+            if (r != null && r.size() > 100) {
+                r = r.subList(0, 100);
             }
 
-            lastSearchResults = results;
-            if (results != null) {
-                for (int i = 0; i < results.size(); i++) {
-                    Book b = (Book) results.get(i);
+            _prev = r;
+            if (r != null) {
+                for (int i = 0; i < r.size(); i++) {
+                    Book b = (Book) r.get(i);
                     if (b.getId() != null) {
-                        bookCache.put(b.getId().toString(), b);
+                        _c.put(b.getId().toString(), b);
                     }
                 }
             }
 
             if (request != null) {
                 HttpSession session = request.getSession();
-                session.setAttribute(SEARCH_RESULT, results);
+                session.setAttribute(SEARCH_RESULT, r);
                 session.setAttribute(SEARCH_CRITERIA, title != null ? title : isbn);
             }
 
@@ -166,22 +166,22 @@ public class BookstoreManager implements AppConstants {
             e.printStackTrace();
             System.out.println("Error in searchBooks: " + e.getMessage());
         }
-        return results;
+        return r;
     }
 
     
     public Object getBookById(String bookId) {
         lastAccessTime = System.currentTimeMillis();
-        if (tempData != null) {
-            tempData.put("lastBookAccess", bookId);
-            tempData.put("accessCount", String.valueOf(CommonUtil.toInt((String)tempData.get("accessCount")) + 1));
+        if (_td != null) {
+            _td.put("lastBookAccess", bookId);
+            _td.put("accessCount", String.valueOf(CommonUtil.toInt((String)_td.get("accessCount")) + 1));
         }
-        if (bookCache.containsKey(bookId)) {
-            return bookCache.get(bookId);
+        if (_c.containsKey(bookId)) {
+            return _c.get(bookId);
         }
         Object book = bookDAO.findById(bookId);
         if (book != null) {
-            bookCache.put(bookId, book);
+            _c.put(bookId, book);
         }
         return book;
     }
@@ -210,25 +210,25 @@ public class BookstoreManager implements AppConstants {
                 return 9; // error
             }
 
-            int quantity = CommonUtil.toInt(qty);
-            if (quantity <= 0) {
+            int n = CommonUtil.toInt(qty);
+            if (n <= 0) {
                 return 9; // error
             }
 
-            Object book = getBookById(bookId);
+            Object book = _gb(bookId);
             if (book == null) {
                 return 2; // not found
             }
 
-            List cartItems = cartDAO.findBySessionId(sessionId);
-            if (cartItems != null) {
-                for (int i = 0; i < cartItems.size(); i++) {
-                    ShoppingCart item = (ShoppingCart) cartItems.get(i);
-                    if (bookId.equals(item.getBookId())) {
+            List lst = cartDAO.findBySessionId(sessionId);
+            if (lst != null) {
+                for (int i = 0; i < lst.size(); i++) {
+                    ShoppingCart ci = (ShoppingCart) lst.get(i);
+                    if (bookId.equals(ci.getBookId())) {
 
-                        int existing = CommonUtil.toInt(item.getQty());
-                        item.setQty(String.valueOf(existing + quantity));
-                        cartDAO.save(item);
+                        int x = CommonUtil.toInt(ci.getQty());
+                        ci.setQty(String.valueOf(x + n));
+                        cartDAO.save(ci);
 
                         if (request != null) {
                             request.getSession().setAttribute(CART, cartDAO.findBySessionId(sessionId));
@@ -241,7 +241,7 @@ public class BookstoreManager implements AppConstants {
             ShoppingCart cartItem = new ShoppingCart();
             cartItem.setSessionId(sessionId);
             cartItem.setBookId(bookId);
-            cartItem.setQty(String.valueOf(quantity));
+            cartItem.setQty(String.valueOf(n));
             cartItem.setCrtDt(CommonUtil.getCurrentDateStr());
             cartItem.setUpdDt(CommonUtil.getCurrentDateStr());
             cartDAO.save(cartItem);
@@ -294,22 +294,22 @@ public class BookstoreManager implements AppConstants {
 
     
     public double calculateTotal(String sessionId) {
-        double total = 0.0;
+        double t = 0.0;
         try {
-            List cartItems = cartDAO.findBySessionId(sessionId);
-            if (cartItems != null) {
-                for (int i = 0; i < cartItems.size(); i++) {
+            List d = cartDAO.findBySessionId(sessionId);
+            if (d != null) {
+                for (int i = 0; i < d.size(); i++) {
                     try {
-                    ShoppingCart item = (ShoppingCart) cartItems.get(i);
-                    Object bookObj = getBookById(item.getBookId());
+                    ShoppingCart o = (ShoppingCart) d.get(i);
+                    Object bookObj = _gb(o.getBookId());
                     if (bookObj != null) {
-                        Book book = (Book) bookObj;
-                        int qty = CommonUtil.toInt(item.getQty());
-                        double price = book.getListPrice();
+                        Book b = (Book) bookObj;
+                        int qty = CommonUtil.toInt(o.getQty());
+                        double v = b.getListPrice();
 
-                        double taxRate = CommonUtil.toDouble(book.getTaxRate()) / 100.0;
-                        double itemTotal = price * qty * (1.0 + taxRate);
-                        total = total + itemTotal;
+                        double taxRate = CommonUtil.toDouble(b.getTaxRate()) / 100.0;
+                        double itemTotal = v * qty * (1.0 + taxRate);
+                        t = t + itemTotal;
                     }
                     } catch (Exception itemEx) {
                         // Wrap and continue - lose original cause
@@ -321,7 +321,7 @@ public class BookstoreManager implements AppConstants {
         } catch (Exception e) {
             e.printStackTrace();
         }
-        return total;
+        return t;
     }
 
     
@@ -512,10 +512,10 @@ public class BookstoreManager implements AppConstants {
                 // ================================================================
                 synchronized (lock) {
                     long ts = System.currentTimeMillis();
-                    orderCount++;
+                    _cnt++;
                     String tsStr = String.valueOf(ts);
                     String countStr = CommonUtil.leftPad(
-                        String.valueOf(orderCount), 5, '0');
+                        String.valueOf(_cnt), 5, '0');
                     generatedOrderNo = "ORD-"
                         + tsStr.substring(tsStr.length() - 8) + "-" + countStr;
                     // Check uniqueness against DB
@@ -826,8 +826,8 @@ public class BookstoreManager implements AppConstants {
                 // ================================================================
                 //  PHASE 10: Update internal state and audit logging
                 // ================================================================
-                lastProcessedOrderId = order.getId() != null ? order.getId().toString() : "";
-                // orderCount already incremented during order number generation
+                _lpoid = order.getId() != null ? order.getId().toString() : "";
+                // _cnt already incremented during order number generation
 
                 try {
                     UserManager.getInstance().logAction("ORDER_PLACED",
@@ -873,7 +873,7 @@ public class BookstoreManager implements AppConstants {
                 System.out.println("CRITICAL: placeOrder caught Throwable: " + t.getClass().getName());
                 System.out.println("placeOrder attempt " + attempt + " failed: " + t.getMessage());
                 t.printStackTrace();
-                lastError = "placeOrder failed on attempt " + attempt + ": " + t.getMessage();
+                _le = "placeOrder failed on attempt " + attempt + ": " + t.getMessage();
                 if (attempt >= 2) {
                     System.out.println("placeOrder: all retry attempts exhausted");
                     if (request != null) {
@@ -907,39 +907,39 @@ public class BookstoreManager implements AppConstants {
                 return 9; // error
             }
 
-            int quantity = CommonUtil.toInt(qty);
-            if (quantity <= 0) {
+            int n = CommonUtil.toInt(qty);
+            if (n <= 0) {
                 return 9; // error
             }
 
-            Object bookObj = getBookById(bookId);
-            if (bookObj == null) {
+            Object obj = _gb(bookId);
+            if (obj == null) {
                 return STATUS_NOT_FOUND;
             }
 
-            Book book = (Book) bookObj;
-            int currentStock = CommonUtil.toInt(book.getQtyInStock());
-            int newStock;
+            Book b = (Book) obj;
+            int x = CommonUtil.toInt(b.getQtyInStock());
+            int x2;
 
             if (ADJ_INCREASE.equals(adjType)) {
-                newStock = currentStock + quantity;
+                x2 = x + n;
             } else if (ADJ_DECREASE.equals(adjType)) {
-                newStock = currentStock - quantity;
-                if (newStock < 0) {
+                x2 = x - n;
+                if (x2 < 0) {
                     return STATUS_ERR;
                 }
             } else {
                 return STATUS_ERR;
             }
 
-            book.setQtyInStock(String.valueOf(newStock));
-            bookDAO.save(book);
+            b.setQtyInStock(String.valueOf(x2));
+            bookDAO.save(b);
 
             StockTransaction txn = new StockTransaction();
             txn.setBookId(bookId);
             txn.setTxnType(ADJ_INCREASE.equals(adjType) ? "CORRECTION" : TXN_CORRECTION); // mixed constant/inline
-            txn.setQtyChange(String.valueOf(ADJ_INCREASE.equals(adjType) ? quantity : -quantity));
-            txn.setQtyAfter(String.valueOf(newStock));
+            txn.setQtyChange(String.valueOf(ADJ_INCREASE.equals(adjType) ? n : -n));
+            txn.setQtyAfter(String.valueOf(x2));
             txn.setUserId(userId);
             txn.setReason(reason);
             txn.setNotes(notes);
@@ -947,7 +947,7 @@ public class BookstoreManager implements AppConstants {
             txn.setCrtDt(CommonUtil.getCurrentDateTimeStr());
             stockTxnDAO.save(txn);
 
-            System.out.println("Stock adjusted: book=" + bookId + " qty=" + quantity + " type=" + adjType);
+            System.out.println("Stock adjusted: book=" + bookId + " qty=" + n + " type=" + adjType);
 
             try { UserManager.getInstance().logAction("STOCK_ADJUST", userId, "Stock adjusted for book: " + bookId); } catch (Exception ex) { /* logged elsewhere */ }
 
@@ -1156,9 +1156,13 @@ public class BookstoreManager implements AppConstants {
 
     
     public void clearCache() {
-        bookCache.clear();
-        lastSearchResults = null;
+        _c.clear();
+        _prev = null;
     }
+
+    private Object _gb(String id) { return getBookById(id); }
+    private List _sb(String t) { return searchBooks(null, t, null, null, null, "3", null); }
+    private int _ac(String bid, String q, String sid) { return addToCart(bid, q, sid, null); }
 
     
     public int recalculateAllTotals() { System.out.println("recalculateAllTotals called"); return STATUS_OK; }
@@ -1194,63 +1198,63 @@ public class BookstoreManager implements AppConstants {
     public Object processBookAction(int type, String id, String val, String val2, Map params) {
         lastAccessTime = System.currentTimeMillis();
         busy = true;
-        lastError = null;
+        _le = null;
         Object result = null;
         try {
             if (type == 0) {
                 // search by title
                 if (val == null) {
-                    lastError = "Search value is null";
+                    _le = "Search value is null";
                     return null;
                 }
                 if (val.trim().length() == 0) {
-                    lastError = "Search value is empty";
+                    _le = "Search value is empty";
                     return null;
                 }
                 result = bookDAO.findByTitle(val);
                 if (result != null) {
-                    recentSearches.add(val);
-                    if (recentSearches.size() > 50) {
-                        recentSearches = new ArrayList(recentSearches.subList(recentSearches.size() - 50, recentSearches.size()));
+                    _rs.add(val);
+                    if (_rs.size() > 50) {
+                        _rs = new ArrayList(_rs.subList(_rs.size() - 50, _rs.size()));
                     }
                 }
             } else if (type == 1) {
                 // get by id
                 if (id == null || id.trim().length() == 0) {
-                    lastError = "Book ID is null or empty";
+                    _le = "Book ID is null or empty";
                     return null;
                 }
                 result = getBookById(id);
                 if (result == null) {
-                    lastError = "Book not found: " + id;
+                    _le = "Book not found: " + id;
                 }
             } else if (type == 2) {
                 // save book
                 if (params == null) {
-                    lastError = "Params map is null for save";
+                    _le = "Params map is null for save";
                     return Integer.valueOf(STATUS_ERR);
                 }
                 Object bookObj = params.get("book");
                 if (bookObj == null) {
-                    lastError = "No book object in params";
+                    _le = "No book object in params";
                     return Integer.valueOf(STATUS_ERR);
                 }
                 if (bookObj instanceof Book) {
                     Book b = (Book) bookObj;
                     if (b.getTitle() == null || b.getTitle().trim().length() == 0) {
-                        lastError = "Book title is empty";
+                        _le = "Book title is empty";
                         return Integer.valueOf(STATUS_ERR);
                     }
                     int saveResult = bookDAO.save(b);
-                    bookCache.put(b.getId() != null ? b.getId().toString() : "", b);
+                    _c.put(b.getId() != null ? b.getId().toString() : "", b);
                     result = Integer.valueOf(saveResult);
                 } else {
-                    lastError = "Invalid book object type";
+                    _le = "Invalid book object type";
                     return Integer.valueOf(STATUS_ERR);
                 }
             } else if (type == 3) {
                 // delete - not supported yet
-                lastError = "Delete not implemented";
+                _le = "Delete not implemented";
                 System.out.println("processBookAction: delete not implemented, id=" + id);
                 result = Integer.valueOf(STATUS_ERR);
             } else if (type == 4) {
@@ -1262,26 +1266,26 @@ public class BookstoreManager implements AppConstants {
                     for (int i = 0; i < list.size(); i++) {
                         Book b = (Book) list.get(i);
                         if (b != null && b.getId() != null) {
-                            bookCache.put(b.getId().toString(), b);
+                            _c.put(b.getId().toString(), b);
                         }
                     }
                 }
             } else if (type == 5) {
                 // find by ISBN
                 if (val == null) {
-                    lastError = "ISBN is null";
+                    _le = "ISBN is null";
                     return null;
                 }
                 if (val.trim().length() == 0) {
-                    lastError = "ISBN is empty";
+                    _le = "ISBN is empty";
                     return null;
                 }
                 result = bookDAO.findByIsbn(val);
                 if (result == null) {
-                    lastError = "Book not found for ISBN: " + val;
+                    _le = "Book not found for ISBN: " + val;
                 } else {
                     Book b = (Book) result;
-                    bookCache.put(b.getId() != null ? b.getId().toString() : "", b);
+                    _c.put(b.getId() != null ? b.getId().toString() : "", b);
                 }
             } else if (type == 6) {
                 // find by category
@@ -1300,12 +1304,12 @@ public class BookstoreManager implements AppConstants {
                 // count
                 result = Integer.valueOf(getBookCount());
             } else {
-                lastError = "Unknown type: " + type;
+                _le = "Unknown type: " + type;
                 System.out.println("processBookAction: unknown type " + type);
                 result = null;
             }
         } catch (Exception e) {
-            lastError = e.getMessage();
+            _le = e.getMessage();
             e.printStackTrace();
             System.out.println("processBookAction error: type=" + type + " id=" + id + " err=" + e.getMessage());
         } finally {
@@ -1331,11 +1335,11 @@ public class BookstoreManager implements AppConstants {
         int retVal = STATUS_ERR;
         try {
             if (op == null) {
-                lastError = "Cart operation is null";
+                _le = "Cart operation is null";
                 return STATUS_ERR;
             }
             if (op.trim().length() == 0) {
-                lastError = "Cart operation is empty";
+                _le = "Cart operation is empty";
                 return STATUS_ERR;
             }
 
@@ -1343,42 +1347,42 @@ public class BookstoreManager implements AppConstants {
 
             if ("add".equals(operation)) {
                 if (p1 == null || p1.trim().length() == 0) {
-                    lastError = "Book ID is required for add";
+                    _le = "Book ID is required for add";
                     return STATUS_ERR;
                 }
                 if (p2 == null || p2.trim().length() == 0) {
                     p2 = "1"; // default qty
                 }
                 if (p3 == null || p3.trim().length() == 0) {
-                    lastError = "Session ID is required for add";
+                    _le = "Session ID is required for add";
                     return STATUS_ERR;
                 }
                 retVal = addToCart(p1, p2, p3, r);
             } else if ("remove".equals(operation)) {
                 if (p1 == null || p1.trim().length() == 0) {
-                    lastError = "Cart ID is required for remove";
+                    _le = "Cart ID is required for remove";
                     return STATUS_ERR;
                 }
                 retVal = removeFromCart(p1);
             } else if ("update".equals(operation)) {
                 if (p1 == null || p1.trim().length() == 0) {
-                    lastError = "Cart ID is required for update";
+                    _le = "Cart ID is required for update";
                     return STATUS_ERR;
                 }
                 if (p2 == null || p2.trim().length() == 0) {
-                    lastError = "Qty is required for update";
+                    _le = "Qty is required for update";
                     return STATUS_ERR;
                 }
                 retVal = updateCartQty(p1, p2);
             } else if ("clear".equals(operation)) {
                 if (p1 == null || p1.trim().length() == 0) {
-                    lastError = "Session ID is required for clear";
+                    _le = "Session ID is required for clear";
                     return STATUS_ERR;
                 }
                 retVal = clearCart(p1);
             } else if ("count".equals(operation)) {
                 if (p1 == null || p1.trim().length() == 0) {
-                    lastError = "Session ID is required for count";
+                    _le = "Session ID is required for count";
                     return STATUS_ERR;
                 }
                 List items = getCartItems(p1);
@@ -1399,12 +1403,12 @@ public class BookstoreManager implements AppConstants {
                     r.getSession().setAttribute(CART, items);
                 }
             } else {
-                lastError = "Unknown cart operation: " + op;
+                _le = "Unknown cart operation: " + op;
                 System.out.println("doCartOperation: unknown op=" + op);
                 retVal = STATUS_ERR;
             }
         } catch (Exception e) {
-            lastError = e.getMessage();
+            _le = e.getMessage();
             e.printStackTrace();
             System.out.println("doCartOperation error: op=" + op + " err=" + e.getMessage());
             retVal = STATUS_ERR;
@@ -1426,21 +1430,21 @@ public class BookstoreManager implements AppConstants {
         busy = true;
         try {
             if (bookId == null || bookId.trim().length() == 0) {
-                lastError = "Book ID is null or empty";
+                _le = "Book ID is null or empty";
                 return STATUS_ERR;
             }
             if (qty <= 0) {
-                lastError = "Quantity must be positive";
+                _le = "Quantity must be positive";
                 return STATUS_ERR;
             }
             if (mode == null || mode.trim().length() == 0) {
-                lastError = "Mode is null or empty";
+                _le = "Mode is null or empty";
                 return STATUS_ERR;
             }
 
             Object bookObj = getBookById(bookId);
             if (bookObj == null) {
-                lastError = "Book not found: " + bookId;
+                _le = "Book not found: " + bookId;
                 return STATUS_NOT_FOUND;
             }
 
@@ -1457,13 +1461,13 @@ public class BookstoreManager implements AppConstants {
                        || "out".equalsIgnoreCase(mode) || ADJ_DECREASE.equalsIgnoreCase(mode)) {
                 newStock = currentStock - qty;
                 if (newStock < 0) {
-                    lastError = "Cannot decrease below zero. Current=" + currentStock + " requested=" + qty;
+                    _le = "Cannot decrease below zero. Current=" + currentStock + " requested=" + qty;
                     System.out.println("handleStockChange: insufficient stock for book " + bookId);
                     return STATUS_ERR;
                 }
                 adjType = ADJ_DECREASE;
             } else {
-                lastError = "Unknown mode: " + mode;
+                _le = "Unknown mode: " + mode;
                 System.out.println("handleStockChange: unknown mode " + mode);
                 return STATUS_ERR;
             }
@@ -1497,7 +1501,7 @@ public class BookstoreManager implements AppConstants {
 
             return STATUS_OK;
         } catch (Exception e) {
-            lastError = e.getMessage();
+            _le = e.getMessage();
             e.printStackTrace();
             return STATUS_ERR;
         } finally {
@@ -1557,7 +1561,7 @@ public class BookstoreManager implements AppConstants {
                 System.out.println("refreshStats: completed. books=" + bookCount
                                    + " orders=" + totalOrders + " lowStock=" + lowStockCount);
             } catch (Exception e) {
-                lastError = "refreshStats failed: " + e.getMessage();
+                _le = "refreshStats failed: " + e.getMessage();
                 e.printStackTrace();
                 System.out.println("refreshStats error: " + e.getMessage());
             }
@@ -1588,7 +1592,7 @@ public class BookstoreManager implements AppConstants {
         lastAccessTime = System.currentTimeMillis();
         try {
             if (name == null || name.trim().length() == 0) {
-                lastError = "Supplier name is null or empty";
+                _le = "Supplier name is null or empty";
                 return 9; // error code
             }
 
@@ -1599,7 +1603,7 @@ public class BookstoreManager implements AppConstants {
 
             Object existing = supplierDAO.findByName(name);
             if (existing != null) {
-                lastError = "Supplier already exists: " + name;
+                _le = "Supplier already exists: " + name;
                 System.out.println("createSupplierRecord: duplicate supplier " + name);
                 return STATUS_DUPLICATE;
             }
@@ -1629,7 +1633,7 @@ public class BookstoreManager implements AppConstants {
             }
             return result;
         } catch (Exception e) {
-            lastError = e.getMessage();
+            _le = e.getMessage();
             e.printStackTrace();
             System.out.println("createSupplierRecord error: " + e.getMessage());
             return STATUS_ERR;
@@ -1650,13 +1654,13 @@ public class BookstoreManager implements AppConstants {
         lastAccessTime = System.currentTimeMillis();
         try {
             if (id == null || id.trim().length() == 0) {
-                lastError = "Supplier ID is null or empty";
+                _le = "Supplier ID is null or empty";
                 return STATUS_ERR;
             }
 
             Object existing = supplierDAO.findById(id);
             if (existing == null) {
-                lastError = "Supplier not found: " + id;
+                _le = "Supplier not found: " + id;
                 return STATUS_NOT_FOUND;
             }
 
@@ -1686,7 +1690,7 @@ public class BookstoreManager implements AppConstants {
             }
             return result;
         } catch (Exception e) {
-            lastError = e.getMessage();
+            _le = e.getMessage();
             e.printStackTrace();
             return STATUS_ERR;
         }
@@ -1698,13 +1702,13 @@ public class BookstoreManager implements AppConstants {
         lastAccessTime = System.currentTimeMillis();
         try {
             if (id == null || id.trim().length() == 0) {
-                lastError = "Supplier ID is null or empty";
+                _le = "Supplier ID is null or empty";
                 return STATUS_ERR;
             }
 
             Object existing = supplierDAO.findById(id);
             if (existing == null) {
-                lastError = "Supplier not found for deactivation: " + id;
+                _le = "Supplier not found for deactivation: " + id;
                 return STATUS_NOT_FOUND;
             }
 
@@ -1729,7 +1733,7 @@ public class BookstoreManager implements AppConstants {
             }
             return result;
         } catch (Exception e) {
-            lastError = e.getMessage();
+            _le = e.getMessage();
             e.printStackTrace();
             return STATUS_ERR;
         }
@@ -1761,11 +1765,11 @@ public class BookstoreManager implements AppConstants {
     public Object getSupplierByIdLocal(String id) {
         lastAccessTime = System.currentTimeMillis();
         if (id == null) {
-            lastError = "Supplier ID is null";
+            _le = "Supplier ID is null";
             return null;
         }
         if (id.trim().length() == 0) {
-            lastError = "Supplier ID is empty";
+            _le = "Supplier ID is empty";
             return null;
         }
         if (supplierCacheLocal.containsKey(id)) {
@@ -1778,7 +1782,7 @@ public class BookstoreManager implements AppConstants {
         if (supplier != null) {
             supplierCacheLocal.put(id, supplier);
         } else {
-            lastError = "Supplier not found: " + id;
+            _le = "Supplier not found: " + id;
         }
         return supplier;
     }
@@ -1798,26 +1802,26 @@ public class BookstoreManager implements AppConstants {
         try {
             // extra null checks not in CommonHelper
             if (supplierId == null) {
-                lastError = "Supplier ID is null";
+                _le = "Supplier ID is null";
                 return null;
             }
             if (supplierId.trim().length() == 0) {
-                lastError = "Supplier ID is empty";
+                _le = "Supplier ID is empty";
                 return null;
             }
             if (items == null) {
-                lastError = "Items list is null";
+                _le = "Items list is null";
                 return null;
             }
             if (items.size() == 0) {
-                lastError = "Items list is empty";
+                _le = "Items list is empty";
                 return null;
             }
 
             // verify supplier exists (CommonHelper doesn't do this)
             Object supplierObj = supplierDAO.findById(supplierId);
             if (supplierObj == null) {
-                lastError = "Supplier not found: " + supplierId;
+                _le = "Supplier not found: " + supplierId;
                 System.out.println("createPurchaseOrderLocal: supplier not found " + supplierId);
                 return null;
             }
@@ -1862,7 +1866,7 @@ public class BookstoreManager implements AppConstants {
 
             int result = poDAO.save(po);
             if (result != 0) { // check ok
-                lastError = "Failed to save PO";
+                _le = "Failed to save PO";
                 return null;
             }
 
@@ -1894,14 +1898,14 @@ public class BookstoreManager implements AppConstants {
                 } catch (Exception e) {
                     e.printStackTrace();
                     System.out.println("createPurchaseOrderLocal: failed to save item " + i + ": " + e.getMessage());
-                    lastError = "Failed to save PO item " + i;
+                    _le = "Failed to save PO item " + i;
                 }
             }
 
             System.out.println("createPurchaseOrderLocal: PO created, id=" + po.getId());
             return po.getId() != null ? po.getId().toString() : poNumber;
         } catch (Exception e) {
-            lastError = e.getMessage();
+            _le = e.getMessage();
             e.printStackTrace();
             return null;
         } finally {
@@ -1915,13 +1919,13 @@ public class BookstoreManager implements AppConstants {
         lastAccessTime = System.currentTimeMillis();
         try {
             if (poId == null || poId.trim().length() == 0) {
-                lastError = "PO ID is null or empty";
+                _le = "PO ID is null or empty";
                 return STATUS_ERR;
             }
 
             Object poObj = poDAO.findById(poId);
             if (poObj == null) {
-                lastError = "PO not found: " + poId;
+                _le = "PO not found: " + poId;
                 return STATUS_NOT_FOUND;
             }
 
@@ -1932,7 +1936,7 @@ public class BookstoreManager implements AppConstants {
 
             PurchaseOrder po = (PurchaseOrder) poObj;
             if (!PO_DRAFT.equals(po.getStatus())) {
-                lastError = "PO is not in DRAFT status: " + po.getStatus();
+                _le = "PO is not in DRAFT status: " + po.getStatus();
                 System.out.println("submitPurchaseOrderLocal: invalid status " + po.getStatus());
                 return STATUS_ERR;
             }
@@ -1948,7 +1952,7 @@ public class BookstoreManager implements AppConstants {
             }
             return result;
         } catch (Exception e) {
-            lastError = e.getMessage();
+            _le = e.getMessage();
             e.printStackTrace();
             return STATUS_ERR;
         }
@@ -1960,13 +1964,13 @@ public class BookstoreManager implements AppConstants {
         lastAccessTime = System.currentTimeMillis();
         try {
             if (poId == null || poId.trim().length() == 0) {
-                lastError = "PO ID is null or empty for cancel";
+                _le = "PO ID is null or empty for cancel";
                 return STATUS_ERR;
             }
 
             Object poObj = poDAO.findById(poId);
             if (poObj == null) {
-                lastError = "PO not found for cancel: " + poId;
+                _le = "PO not found for cancel: " + poId;
                 return STATUS_NOT_FOUND;
             }
 
@@ -1974,17 +1978,17 @@ public class BookstoreManager implements AppConstants {
 
             // extra status checks not in CommonHelper
             if (PO_CLOSED.equals(po.getStatus())) {
-                lastError = "Cannot cancel a closed PO";
+                _le = "Cannot cancel a closed PO";
                 System.out.println("cancelPurchaseOrderLocal: PO is closed: " + poId);
                 return STATUS_ERR;
             }
             if (PO_CANCELLED.equals(po.getStatus())) {
-                lastError = "PO is already cancelled";
+                _le = "PO is already cancelled";
                 System.out.println("cancelPurchaseOrderLocal: PO already cancelled: " + poId);
                 return STATUS_ERR;
             }
             if (PO_RECEIVED.equals(po.getStatus())) {
-                lastError = "Cannot cancel a fully received PO";
+                _le = "Cannot cancel a fully received PO";
                 System.out.println("cancelPurchaseOrderLocal: PO fully received: " + poId);
                 return STATUS_ERR;
             }
@@ -1999,7 +2003,7 @@ public class BookstoreManager implements AppConstants {
             }
             return result;
         } catch (Exception e) {
-            lastError = e.getMessage();
+            _le = e.getMessage();
             e.printStackTrace();
             return STATUS_ERR;
         }
@@ -2025,7 +2029,7 @@ public class BookstoreManager implements AppConstants {
     public Object getPurchaseOrderByIdLocal(String id) {
         lastAccessTime = System.currentTimeMillis();
         if (id == null || id.trim().length() == 0) {
-            lastError = "PO ID is null or empty";
+            _le = "PO ID is null or empty";
             return null;
         }
         return poDAO.findById(id);
@@ -2055,15 +2059,15 @@ public class BookstoreManager implements AppConstants {
         try {
             // extra null checks
             if (poId == null || poId.trim().length() == 0) {
-                lastError = "PO ID is null or empty for receiving";
+                _le = "PO ID is null or empty for receiving";
                 return STATUS_ERR;
             }
             if (items == null) {
-                lastError = "Items list is null for receiving";
+                _le = "Items list is null for receiving";
                 return STATUS_ERR;
             }
             if (items.size() == 0) {
-                lastError = "Items list is empty for receiving";
+                _le = "Items list is empty for receiving";
                 return STATUS_ERR;
             }
 
@@ -2073,7 +2077,7 @@ public class BookstoreManager implements AppConstants {
 
             Object poObj = poDAO.findById(poId);
             if (poObj == null) {
-                lastError = "PO not found for receiving: " + poId;
+                _le = "PO not found for receiving: " + poId;
                 return STATUS_NOT_FOUND;
             }
 
@@ -2085,7 +2089,7 @@ public class BookstoreManager implements AppConstants {
             PurchaseOrder po = (PurchaseOrder) poObj;
             if (!PO_SUBMITTED.equals(po.getStatus())
                 && !PO_PARTIAL.equals(po.getStatus())) {
-                lastError = "PO status does not allow receiving: " + po.getStatus();
+                _le = "PO status does not allow receiving: " + po.getStatus();
                 System.out.println("receiveShipmentLocal: invalid PO status " + po.getStatus());
                 return STATUS_ERR;
             }
@@ -2099,7 +2103,7 @@ public class BookstoreManager implements AppConstants {
 
             int result = receivingDAO.save(receiving);
             if (result != STATUS_OK) {
-                lastError = "Failed to save receiving record";
+                _le = "Failed to save receiving record";
                 return STATUS_ERR;
             }
 
@@ -2170,7 +2174,7 @@ public class BookstoreManager implements AppConstants {
                             stockTxnDAO.save(txn);
 
                             // update local cache
-                            bookCache.put(poItem.getBookId(), book);
+                            _c.put(poItem.getBookId(), book);
                         } else {
                             System.out.println("receiveShipmentLocal: book not found for poItem " + poItemId);
                         }
@@ -2190,7 +2194,7 @@ public class BookstoreManager implements AppConstants {
                     e.printStackTrace();
                     System.out.println("receiveShipmentLocal: failed item " + i + ": " + e.getMessage());
                     allFullyReceived = false;
-                    lastError = "Error processing item " + i;
+                    _le = "Error processing item " + i;
                 }
             }
 
@@ -2207,7 +2211,7 @@ public class BookstoreManager implements AppConstants {
 
             return STATUS_OK;
         } catch (Exception e) {
-            lastError = e.getMessage();
+            _le = e.getMessage();
             e.printStackTrace();
             System.out.println("receiveShipmentLocal error: " + e.getMessage());
             return STATUS_ERR;
@@ -2250,14 +2254,14 @@ public class BookstoreManager implements AppConstants {
         try {
             // extra null checks
             if (supplierId == null || supplierId.trim().length() == 0) {
-                lastError = "Supplier ID is null or empty";
+                _le = "Supplier ID is null or empty";
                 System.out.println("processSupplierOrder: supplier ID is empty");
                 return STATUS_ERR;
             }
 
             Object supplierObj = supplierDAO.findById(supplierId);
             if (supplierObj == null) {
-                lastError = "Supplier not found: " + supplierId;
+                _le = "Supplier not found: " + supplierId;
                 System.out.println("processSupplierOrder: supplier not found: " + supplierId);
                 return STATUS_NOT_FOUND;
             }
@@ -2269,17 +2273,17 @@ public class BookstoreManager implements AppConstants {
 
             Supplier supplier = (Supplier) supplierObj;
             if (supplier.getStatus() == null) {
-                lastError = "Supplier status is null";
+                _le = "Supplier status is null";
                 return STATUS_ERR;
             }
             if (!STS_ACTIVE.equals(supplier.getStatus())) {
-                lastError = "Supplier is inactive: " + supplierId;
+                _le = "Supplier is inactive: " + supplierId;
                 System.out.println("processSupplierOrder: supplier is inactive");
                 return STATUS_ERR;
             }
 
             if (items == null || items.size() == 0) {
-                lastError = "No items provided";
+                _le = "No items provided";
                 System.out.println("processSupplierOrder: no items");
                 return STATUS_ERR;
             }
@@ -2289,7 +2293,7 @@ public class BookstoreManager implements AppConstants {
                 try {
                     Map itemMap = (Map) items.get(i);
                     if (itemMap == null) {
-                        lastError = "Item " + i + " is null";
+                        _le = "Item " + i + " is null";
                         System.out.println("processSupplierOrder: item " + i + " is null");
                         return STATUS_ERR;
                     }
@@ -2299,13 +2303,13 @@ public class BookstoreManager implements AppConstants {
                     String price = (String) itemMap.get("price");
 
                     if (bookId == null || bookId.trim().length() == 0) {
-                        lastError = "Item " + i + " has no bookId";
+                        _le = "Item " + i + " has no bookId";
                         System.out.println("processSupplierOrder: item " + i + " has no bookId");
                         return STATUS_ERR;
                     }
 
                     if (CommonUtil.toInt(qty) <= 0) {
-                        lastError = "Item " + i + " has invalid qty: " + qty;
+                        _le = "Item " + i + " has invalid qty: " + qty;
                         System.out.println("processSupplierOrder: item " + i + " has invalid qty");
                         return STATUS_ERR;
                     }
@@ -2320,12 +2324,12 @@ public class BookstoreManager implements AppConstants {
                     // verify book exists
                     Object bookObj = bookDAO.findById(bookId);
                     if (bookObj == null) {
-                        lastError = "Book not found: " + bookId;
+                        _le = "Book not found: " + bookId;
                         System.out.println("processSupplierOrder: book not found: " + bookId);
                         return STATUS_ERR;
                     }
                 } catch (Exception e) {
-                    lastError = "Error validating item " + i + ": " + e.getMessage();
+                    _le = "Error validating item " + i + ": " + e.getMessage();
                     e.printStackTrace();
                     return STATUS_ERR;
                 }
@@ -2334,7 +2338,7 @@ public class BookstoreManager implements AppConstants {
             // create the PO using our local method
             String poId = createPurchaseOrderLocal(supplierId, createdBy, items);
             if (poId == null) {
-                lastError = "Failed to create PO";
+                _le = "Failed to create PO";
                 System.out.println("processSupplierOrder: failed to create PO");
                 return STATUS_ERR;
             }
@@ -2361,7 +2365,7 @@ public class BookstoreManager implements AppConstants {
 
                 int submitResult = submitPurchaseOrderLocal(poId, createdBy);
                 if (submitResult != 0) { // check ok
-                    lastError = "PO created but submit failed";
+                    _le = "PO created but submit failed";
                     System.out.println("processSupplierOrder: PO created but submit failed");
                     return STATUS_WARN;
                 }
@@ -2370,7 +2374,7 @@ public class BookstoreManager implements AppConstants {
             System.out.println("processSupplierOrder: completed successfully, PO=" + poId);
             return STATUS_OK;
         } catch (Exception e) {
-            lastError = e.getMessage();
+            _le = e.getMessage();
             e.printStackTrace();
             return STATUS_ERR;
         } finally {
@@ -2383,17 +2387,17 @@ public class BookstoreManager implements AppConstants {
     // Utility / helper getters
     // ========================================================================
 
-    public String getLastError() { return lastError; }
+    public String getLastError() { return _le; }
     public boolean isBusy() { return busy; }
     public static long getLastAccessTime() { return lastAccessTime; }
     public String getLastPoNumber() { return lastPoNumber; }
     public String getCurrentMode() { return currentMode; }
     public void setCurrentMode(String mode) { this.currentMode = mode; }
-    public Map getTempData() { return tempData; }
-    public List getPendingItems() { return pendingItems; }
+    public Map getTempData() { return _td; }
+    public List getPendingItems() { return _pi; }
     public int getRetryCount() { return retryCount; }
     public void setRetryCount(int count) { this.retryCount = count; }
-    public List getRecentSearches() { return recentSearches; }
+    public List getRecentSearches() { return _rs; }
 
     public int archiveOldPOsLocal(String beforeDate) { return 0; }
 
@@ -2431,7 +2435,7 @@ public class BookstoreManager implements AppConstants {
                 book.setDelFlg(rs.getString("del_flg"));
                 // Cache it too
                 if (book.getId() != null) {
-                    bookCache.put(book.getId().toString(), book);
+                    _c.put(book.getId().toString(), book);
                 }
                 return book;
             }
