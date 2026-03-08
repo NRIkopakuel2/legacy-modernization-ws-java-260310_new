@@ -7,6 +7,8 @@ import java.sql.Date;
 import java.math.BigDecimal;
 import java.util.concurrent.*;
 
+import com.example.bookstore.util.DebugUtil;
+
 public class DbUtil {
 
     private static final String DB_URL = "jdbc:mysql://localhost:3306/legacy_db?useSSL=false&autoReconnect=true";
@@ -29,6 +31,7 @@ public class DbUtil {
 
 
     public static Connection getConnection() {
+        DebugUtil.debug("DbUtil.getConnection() called");
         Connection conn = null;
         try {
             Class.forName("com.mysql.jdbc.Driver");
@@ -165,6 +168,7 @@ public class DbUtil {
 
     // Convenience query method — BUG: connection is never closed!
     public static java.util.List executeQuery(String sql) {
+        DebugUtil.log("DbUtil.executeQuery: " + sql);
         java.util.List results = new java.util.ArrayList();
         Connection conn = null;
         Statement stmt = null;

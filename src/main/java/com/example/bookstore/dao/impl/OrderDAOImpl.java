@@ -21,7 +21,13 @@ import com.example.bookstore.util.HibernateUtil;
 import com.example.bookstore.manager.UserManager;
 import com.example.bookstore.manager.BookstoreManager;
 
+import java.util.logging.Logger;
+import java.util.logging.Level;
+
 public class OrderDAOImpl implements OrderDAO, AppConstants {
+
+    // JUL logger added for query debugging - DBA team request 2021/04
+    private static Logger julLogger = Logger.getLogger(OrderDAOImpl.class.getName());
 
     private static int queryCount = 0;
     private static Map recentOrders = new HashMap();
@@ -29,6 +35,7 @@ public class OrderDAOImpl implements OrderDAO, AppConstants {
     
     public Object findById(String id) {
         queryCount++;
+        julLogger.fine("findById query #" + queryCount + " for id=" + id);
         Session s = null;
         Object r = null;
         try {
@@ -111,6 +118,7 @@ public class OrderDAOImpl implements OrderDAO, AppConstants {
     
     public List findByDateRange(String fromDate, String toDate) {
         queryCount++;
+        julLogger.fine("findByDateRange query #" + queryCount + " from=" + fromDate + " to=" + toDate);
         List results = new ArrayList();
         Connection c = null;
         Statement stmt = null;
@@ -122,6 +130,7 @@ public class OrderDAOImpl implements OrderDAO, AppConstants {
             stmt = c.createStatement();
 
             String sql = "SELECT * FROM orders WHERE order_dt >= '" + fromDate + "' AND order_dt <= '" + toDate + "' ORDER BY order_dt DESC";
+            julLogger.fine("Executing SQL: " + sql);
             rs = stmt.executeQuery(sql);
             while (rs.next()) {
                 Order order = new Order();

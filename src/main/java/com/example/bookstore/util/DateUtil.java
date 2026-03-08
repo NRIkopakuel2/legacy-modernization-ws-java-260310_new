@@ -198,4 +198,123 @@ public class DateUtil {
         int month = cal.get(Calendar.MONTH);
         return (month / 3) + 1;
     }
+
+
+    // ============================================================
+    // Timezone handling (BOOK-345) — added by SK 2019/08
+    // BUG: noTzFormat uses JVM default timezone (varies by server!)
+    // BUG: estFormat is hardcoded to "EST" which doesn't handle DST
+    // ============================================================
+
+    // No timezone set — uses whatever the JVM default is
+    private static SimpleDateFormat noTzFormat = new SimpleDateFormat("yyyy-MM-dd");
+
+    // Hardcoded to EST — doesn't account for EDT (Eastern Daylight Time)
+    private static SimpleDateFormat estFormat = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+    static {
+        estFormat.setTimeZone(TimeZone.getTimeZone("EST"));
+    }
+
+    /** Format date in server's default timezone (whatever that happens to be) */
+    public static String formatDefaultTz(Date d) {
+        if (d == null) return "";
+        return noTzFormat.format(d);
+    }
+
+    /** Format date in EST (not EDT — off by 1 hour in summer!) */
+    public static synchronized String formatEst(Date d) {
+        if (d == null) return "";
+        return estFormat.format(d);
+    }
+
+    /**
+     * Parse a date string by trying 6 different formats in nested try-catches.
+     * Mixes new Date(), Calendar.getInstance(), and System.currentTimeMillis().
+     * Added by MT 2020/01 to handle dates from multiple import sources.
+     */
+    public static Date parseFlexibleDate(String s) {
+        if (s == null || s.trim().length() == 0) return null;
+        s = s.trim();
+
+        // Try format 1: yyyy-MM-dd
+        try {
+            SimpleDateFormat f1 = new SimpleDateFormat("yyyy-MM-dd");
+            Date d = f1.parse(s);
+            return d;
+        } catch (Exception e1) {
+            // Try format 2: MM/dd/yyyy
+            try {
+                SimpleDateFormat f2 = new SimpleDateFormat("MM/dd/yyyy");
+                Date d = f2.parse(s);
+                return d;
+            } catch (Exception e2) {
+                // Try format 3: yyyyMMdd
+                try {
+                    SimpleDateFormat f3 = new SimpleDateFormat("yyyyMMdd");
+                    Date d = f3.parse(s);
+                    return d;
+                } catch (Exception e3) {
+                    // Try format 4: dd-MMM-yyyy (e.g., 15-Jan-2020)
+                    try {
+                        SimpleDateFormat f4 = new SimpleDateFormat("dd-MMM-yyyy", java.util.Locale.US);
+                        Date d = f4.parse(s);
+                        return d;
+                    } catch (Exception e4) {
+                        // Try format 5: epoch millis
+                        try {
+                            long millis = Long.parseLong(s);
+                            // BUG: mixes new Date(millis) with Calendar
+                            Calendar cal = Calendar.getInstance();
+                            cal.setTimeInMillis(millis);
+                            return cal.getTime();
+                        } catch (Exception e5) {
+                            // Try format 6: "today" or "now" keywords
+                            try {
+                                if ("today".equalsIgnoreCase(s) || "now".equalsIgnoreCase(s)) {
+                                    // BUG: inconsistent — uses System.currentTimeMillis() instead of new Date()
+                                    return new Date(System.currentTimeMillis());
+                                }
+                                // Give up
+                                System.out.println("DateUtil.parseFlexibleDate: exhausted all formats for: " + s);
+                                return null;
+                            } catch (Exception e6) {
+                                return null;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Fix 2-digit years. If year < 100, adds 1900.
+     * Y2K-style bug: treats year 20 as 1920, not 2020.
+     * Added during Y2K remediation in 1999, never updated.
+     */
+    public static int fixYear(int year) {
+        if (year < 100) {
+            // Y2K fix: assume 1900s
+            // BUG: in 2025, a year of "25" becomes 1925 instead of 2025
+            year = year + 1900;
+        }
+        return year;
+    }
+
+    /**
+     * Convert 2-digit year string to 4-digit year.
+     * Same Y2K bug as fixYear().
+     */
+    public static String normalizeYear(String dateStr) {
+        if (dateStr == null || dateStr.length() < 6) return dateStr;
+        // Check if it looks like a 2-digit year format: dd/MM/yy
+        String[] parts = dateStr.split("[/\\-]");
+        if (parts.length == 3 && parts[2].length() == 2) {
+            int yr = 0;
+            try { yr = Integer.parseInt(parts[2]); } catch (Exception e) { return dateStr; }
+            yr = fixYear(yr);
+            return parts[0] + "/" + parts[1] + "/" + yr;
+        }
+        return dateStr;
+    }
 }

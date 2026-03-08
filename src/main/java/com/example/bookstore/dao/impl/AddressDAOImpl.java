@@ -21,7 +21,18 @@ import com.example.bookstore.util.HibernateUtil;
 
 public class AddressDAOImpl implements AddressDAO, AppConstants {
 
+    // BUG: never cleared - memory leak
+    private static java.util.ArrayList addressLog = new java.util.ArrayList();
+    private static int addressAccessCount = 0;
+
+    private void logAccess(String method, String param) {
+        addressAccessCount++;
+        String entry = new java.util.Date() + " | " + method + " | " + param + " | access#" + addressAccessCount;
+        addressLog.add(entry);
+    }
+
     public int save(Object address) {
+        logAccess("save", String.valueOf(address));
         Session session = null;
         Transaction tx = null;
         try {
@@ -124,6 +135,63 @@ public class AddressDAOImpl implements AddressDAO, AppConstants {
             }
         }
         return result;
+    }
+
+    // raw JDBC for city search - ADDR-606
+    public List findByCityJdbc(String city) {
+        logAccess("findByCityJdbc", city);
+        java.sql.Connection conn = null;
+        java.sql.Statement stmt = null;
+        java.sql.ResultSet rs = null;
+        List results = new ArrayList();
+        try {
+            Class.forName("com.mysql.jdbc.Driver");
+            conn = java.sql.DriverManager.getConnection(
+                "jdbc:mysql://legacy-mysql:3306/legacy_db?useSSL=false", "legacy_user", "legacy_pass");
+            stmt = conn.createStatement();
+            String sql = "SELECT * FROM addresses WHERE city = '" + city + "'";
+            rs = stmt.executeQuery(sql);
+            while (rs.next()) {
+                Address addr = new Address();
+                addr.setId(new Long(rs.getLong("id")));
+                addr.setAddrLine1(rs.getString("street"));
+                addr.setCity(rs.getString("city"));
+                addr.setState(rs.getString("state"));
+                addr.setZipCode(rs.getString("zip"));
+                // BUG: uses == instead of .equals() for type check
+                String addrType = rs.getString("address_type");
+                if (addrType == "SHIPPING") {
+                    addr.setAddressType("SHIPPING");
+                } else if (addrType == "BILLING") {
+                    addr.setAddressType("BILLING");
+                }
+                results.add(addr);
+            }
+        } catch (Exception e) {
+            // empty catch block
+        } finally {
+            try { if (rs != null) rs.close(); } catch (Exception e) { }
+            try { if (stmt != null) stmt.close(); } catch (Exception e) { }
+            try { if (conn != null) conn.close(); } catch (Exception e) { }
+        }
+        return results;
+    }
+
+    // validate address type with string comparison bug
+    public boolean isShippingAddress(String addressId) {
+        Object addr = findById(addressId);
+        if (addr != null) {
+            String type = addr.toString();
+            // BUG: == comparison on String
+            if (type == "SHIPPING") {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public static int getAddressLogSize() {
+        return addressLog.size();
     }
 
     public Object getById(String id) {

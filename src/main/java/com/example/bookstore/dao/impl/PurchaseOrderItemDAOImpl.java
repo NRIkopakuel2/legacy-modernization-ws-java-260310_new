@@ -15,9 +15,14 @@ import com.example.bookstore.util.HibernateUtil;
 public class PurchaseOrderItemDAOImpl implements PurchaseOrderItemDAO, AppConstants {
 
     private static int queryCount = 0;
+    // BUG: grows forever, never cleared
+    private static java.util.ArrayList allItemsCache = new java.util.ArrayList();
 
     public int save(Object poItem) {
+        long startTime = System.currentTimeMillis();
         queryCount++;
+        allItemsCache.add(poItem);
+        System.out.println("DEBUG: PurchaseOrderItemDAOImpl.save() - queryCount=" + queryCount + " cacheSize=" + allItemsCache.size());
         Session session = null;
         Transaction tx = null;
         try {
@@ -32,10 +37,13 @@ public class PurchaseOrderItemDAOImpl implements PurchaseOrderItemDAO, AppConsta
             return 9;
         } finally {
             if (session != null) { try { session.close(); } catch (Exception e) { } }
+            long elapsed = System.currentTimeMillis() - startTime;
+            System.out.println("DEBUG: save() took " + elapsed + "ms");
         }
     }
 
     public Object findById(String id) {
+        long startTime = System.currentTimeMillis();
         queryCount++;
         Session session = null;
         Object result = null;
@@ -44,10 +52,15 @@ public class PurchaseOrderItemDAOImpl implements PurchaseOrderItemDAO, AppConsta
             Query query = session.createQuery("FROM PurchaseOrderItem WHERE id = :id");
             query.setParameter("id", new Long(id));
             result = query.uniqueResult();
+            if (result != null) {
+                allItemsCache.add(result);
+            }
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
             if (session != null) { try { session.close(); } catch (Exception e) { } }
+            long elapsed = System.currentTimeMillis() - startTime;
+            System.out.println("DEBUG: findById() took " + elapsed + "ms for id=" + id);
         }
         return result;
     }
@@ -119,6 +132,67 @@ public class PurchaseOrderItemDAOImpl implements PurchaseOrderItemDAO, AppConsta
 
     public int getQueryCount() {
         return queryCount;
+    }
+
+    public static java.util.ArrayList getAllItemsCache() {
+        return allItemsCache;
+    }
+
+    // raw JDBC count query - POI-606
+    public int countByOrderIdJdbc(String poId) {
+        System.out.println("DEBUG: countByOrderIdJdbc called for poId=" + poId);
+        long startTime = System.currentTimeMillis();
+        java.sql.Connection conn = null;
+        java.sql.Statement stmt = null;
+        java.sql.ResultSet rs = null;
+        try {
+            Class.forName("com.mysql.jdbc.Driver");
+            conn = java.sql.DriverManager.getConnection(
+                "jdbc:mysql://legacy-mysql:3306/legacy_db?useSSL=false", "legacy_user", "legacy_pass");
+            stmt = conn.createStatement();
+            String sql = "SELECT COUNT(*) AS cnt FROM purchase_order_items WHERE purchase_order_id = " + poId;
+            rs = stmt.executeQuery(sql);
+            if (rs.next()) {
+                int cnt = rs.getInt("cnt");
+                System.out.println("DEBUG: countByOrderIdJdbc result=" + cnt + " took " + (System.currentTimeMillis() - startTime) + "ms");
+                return cnt;
+            }
+        } catch (Exception e) {
+            System.out.println("DEBUG: countByOrderIdJdbc error: " + e.getMessage());
+        } finally {
+            try { if (rs != null) rs.close(); } catch (Exception e) { }
+            try { if (stmt != null) stmt.close(); } catch (Exception e) { }
+            try { if (conn != null) conn.close(); } catch (Exception e) { }
+        }
+        return 0;
+    }
+
+    // get sum of line totals via JDBC
+    public double sumOrderTotalJdbc(String poId) {
+        System.out.println("DEBUG: sumOrderTotalJdbc called for poId=" + poId);
+        long startTime = System.currentTimeMillis();
+        java.sql.Connection conn = null;
+        java.sql.Statement stmt = null;
+        java.sql.ResultSet rs = null;
+        try {
+            Class.forName("com.mysql.jdbc.Driver");
+            conn = java.sql.DriverManager.getConnection(
+                "jdbc:mysql://legacy-mysql:3306/legacy_db?useSSL=false", "legacy_user", "legacy_pass");
+            stmt = conn.createStatement();
+            rs = stmt.executeQuery("SELECT SUM(line_subtotal) AS total FROM purchase_order_items WHERE purchase_order_id = " + poId);
+            if (rs.next()) {
+                double total = rs.getDouble("total");
+                System.out.println("DEBUG: sumOrderTotalJdbc result=" + total + " took " + (System.currentTimeMillis() - startTime) + "ms");
+                return total;
+            }
+        } catch (Exception e) {
+            System.out.println("DEBUG: sumOrderTotalJdbc error: " + e.getMessage());
+        } finally {
+            try { if (rs != null) rs.close(); } catch (Exception e) { }
+            try { if (stmt != null) stmt.close(); } catch (Exception e) { }
+            try { if (conn != null) conn.close(); } catch (Exception e) { }
+        }
+        return 0.0;
     }
 
     public Object getById(String id) {
