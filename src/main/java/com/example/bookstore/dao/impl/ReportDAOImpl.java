@@ -8,11 +8,14 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.util.LinkedHashMap;
 
 import com.example.bookstore.constant.AppConstants;
 import com.example.bookstore.dao.ReportDAO;
 
 public class ReportDAOImpl implements ReportDAO, AppConstants {
+
+    // TODO: optimize queries - daily sales report takes 30+ seconds on large datasets
 
     private static final String DB_URL = "jdbc:mysql://legacy-mysql:3306/legacy_db?useSSL=false";
     private static final String DB_USER = "legacy_user";
