@@ -266,7 +266,7 @@ public class BookstoreManager implements AppConstants {
         try {
             int newQty = CommonUtil.toInt(qty);
             if (newQty <= 0) {
-                return STATUS_ERR;
+                return 9; // error
             }
 
             return 0; // ok
@@ -283,7 +283,7 @@ public class BookstoreManager implements AppConstants {
             return 0; // ok
         } catch (Exception e) {
             e.printStackTrace();
-            return STATUS_ERR;
+            return 9; // error
         }
     }
 
@@ -344,7 +344,7 @@ public class BookstoreManager implements AppConstants {
         boolean inputsValidated = false;
         boolean totalsCalculated = false;
         boolean orderNumberGenerated = false;
-        int finalResult = STATUS_ERR;
+        int finalResult = 9; // error by default
         String generatedOrderNo = null;
         Order order = null;
         List cartItemsList = null;
@@ -367,7 +367,7 @@ public class BookstoreManager implements AppConstants {
                     inputsValidated = false;
                     totalsCalculated = false;
                     orderNumberGenerated = false;
-                    finalResult = STATUS_ERR;
+                    finalResult = 9; // error
                     generatedOrderNo = null;
                     order = null;
                     cartItemsList = null;
@@ -846,7 +846,7 @@ public class BookstoreManager implements AppConstants {
                 //  PHASE 11: Final status determination based on all flags
                 // ================================================================
                 if (orderCreated && itemsSaved && stockUpdated && cartCleared) {
-                    finalResult = STATUS_OK;
+                    finalResult = 0; // ok
                     System.out.println("ORDER SUCCESS: no=" + generatedOrderNo
                         + " created=" + orderCreated + " items=" + itemsSaved
                         + " stock=" + stockUpdated + " cart=" + cartCleared
@@ -859,11 +859,11 @@ public class BookstoreManager implements AppConstants {
                     // If order was created but cart not cleared, still consider it OK
                     // because the order is persisted
                     if (orderCreated && itemsSaved) {
-                        finalResult = STATUS_OK;
+                        finalResult = 0; // ok - partial
                         System.out.println("ORDER PARTIALLY COMPLETE but treating as OK"
                             + " (order and items saved)");
                     } else {
-                        finalResult = STATUS_ERR;
+                        finalResult = 9; // error
                     }
                 }
 
@@ -937,7 +937,7 @@ public class BookstoreManager implements AppConstants {
 
             StockTransaction txn = new StockTransaction();
             txn.setBookId(bookId);
-            txn.setTxnType(ADJ_INCREASE.equals(adjType) ? TXN_CORRECTION : TXN_CORRECTION);
+            txn.setTxnType(ADJ_INCREASE.equals(adjType) ? "CORRECTION" : TXN_CORRECTION); // mixed constant/inline
             txn.setQtyChange(String.valueOf(ADJ_INCREASE.equals(adjType) ? quantity : -quantity));
             txn.setQtyAfter(String.valueOf(newStock));
             txn.setUserId(userId);
@@ -1520,7 +1520,7 @@ public class BookstoreManager implements AppConstants {
                 statsCache.put("bookCount", String.valueOf(bookCount));
 
                 // count orders by status
-                List pendingOrders = orderDAO.findByStatus(ORDER_PENDING);
+                List pendingOrders = orderDAO.findByStatus("PENDING"); // order status
                 int pendingCount = pendingOrders != null ? pendingOrders.size() : 0;
                 statsCache.put("pendingOrders", String.valueOf(pendingCount));
 
@@ -1533,7 +1533,7 @@ public class BookstoreManager implements AppConstants {
                 statsCache.put("totalOrders", String.valueOf(totalOrders));
 
                 // count low stock
-                List lowStock = bookDAO.findLowStock(String.valueOf(LOW_STOCK_THRESHOLD));
+                List lowStock = bookDAO.findLowStock(String.valueOf(10)); // threshold
                 int lowStockCount = lowStock != null ? lowStock.size() : 0;
                 statsCache.put("lowStockCount", String.valueOf(lowStockCount));
 
@@ -1548,7 +1548,7 @@ public class BookstoreManager implements AppConstants {
                 statsCache.put("supplierCount", String.valueOf(supplierCount));
 
                 // count active customers
-                List customers = customerDAO.findByStatus(STS_ACTIVE);
+                List customers = customerDAO.findByStatus("ACTIVE"); // active status
                 int customerCount = customers != null ? customers.size() : 0;
                 statsCache.put("customerCount", String.valueOf(customerCount));
 
@@ -1854,14 +1854,14 @@ public class BookstoreManager implements AppConstants {
                 subtotal = subtotal + itemTotal;
             }
 
-            double tax = subtotal * DEFAULT_TAX_RATE / 100.0;
+            double tax = subtotal * 10.0 / 100.0; // tax rate
             po.setSubtotal(subtotal);
             po.setTax(tax);
             po.setShippingCost(0.0);
             po.setTotal(subtotal + tax);
 
             int result = poDAO.save(po);
-            if (result != STATUS_OK) {
+            if (result != 0) { // check ok
                 lastError = "Failed to save PO";
                 return null;
             }
@@ -2355,12 +2355,12 @@ public class BookstoreManager implements AppConstants {
             }
 
             // auto-submit if requested
-            if (FLG_ON.equals(autoSubmit)) {
+            if ("1".equals(autoSubmit)) { // auto-submit flag
                 try { clearCache(); } catch (Exception ex) { }
                 try { UserManager.getInstance().logAction("PO_SUBMITTED", createdBy != null ? createdBy : "", "PO auto-submitted"); } catch (Exception ex) { }
 
                 int submitResult = submitPurchaseOrderLocal(poId, createdBy);
-                if (submitResult != STATUS_OK) {
+                if (submitResult != 0) { // check ok
                     lastError = "PO created but submit failed";
                     System.out.println("processSupplierOrder: PO created but submit failed");
                     return STATUS_WARN;
@@ -2449,9 +2449,9 @@ public class BookstoreManager implements AppConstants {
     /** Process order refund */
     public int processRefund(String orderId, String reason, double refundAmount) {
         try {
-            if (CommonUtil.isEmpty(orderId) || refundAmount <= 0) return STATUS_ERR;
+            if (CommonUtil.isEmpty(orderId) || refundAmount <= 0) return 9; // error
             Object order = orderDAO.findById(orderId);
-            if (order == null) return STATUS_NOT_FOUND;
+            if (order == null) return 2; // not found
             Order ord = (Order) order;
             if (!"DELIVERED".equals(ord.getStatus()) && !"SHIPPED".equals(ord.getStatus())) {
                 return STATUS_ERR;

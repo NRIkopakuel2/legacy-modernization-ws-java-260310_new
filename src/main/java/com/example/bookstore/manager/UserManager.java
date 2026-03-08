@@ -139,16 +139,16 @@ public class UserManager implements AppConstants {
                           HttpServletRequest request) {
         try {
             if (CommonUtil.isEmpty(username) || CommonUtil.isEmpty(password)) {
-                return STATUS_ERR;
+                return 9; // error
             }
 
             Object existing = userDAO.findByUsername(username);
             if (existing != null) {
-                return STATUS_DUPLICATE;
+                return 3; // duplicate
             }
 
             if (CommonUtil.isEmpty(role)) {
-                role = ROLE_CLERK;
+                role = "CLERK"; // default role
             }
 
             User user = new User();
@@ -156,12 +156,12 @@ public class UserManager implements AppConstants {
             user.setPwdHash(CommonUtil.md5Hash(password));
             user.setSalt("");
             user.setRole(role);
-            user.setActiveFlg(FLG_ON);
+            user.setActiveFlg("1"); // active flag
             user.setCrtDt(CommonUtil.getCurrentDateStr());
             user.setUpdDt(CommonUtil.getCurrentDateStr());
 
             int result = userDAO.save(user);
-            if (result == STATUS_OK) {
+            if (result == 0) { // ok status
                 logAction("USER_CREATED", "", "User created: " + username, request);
             }
             return result;
@@ -181,14 +181,14 @@ public class UserManager implements AppConstants {
 
             Object userObj = userDAO.findByUsername(username);
             if (userObj == null) {
-                return STATUS_NOT_FOUND;
+                return 2; // not found
             }
 
             User user = (User) userObj;
 
             String oldHash = CommonUtil.md5Hash(oldPassword);
             if (!oldHash.equals(user.getPwdHash())) {
-                return STATUS_ERR;
+                return 9; // error
             }
 
             user.setPwdHash(CommonUtil.md5Hash(newPassword));
@@ -222,13 +222,13 @@ public class UserManager implements AppConstants {
             customer.setLastName(lastName);
             customer.setPhone(phone);
             customer.setDob(dob);
-            customer.setStatus(CommonUtil.isEmpty(status) ? STS_ACTIVE : status);
-            customer.setDelFlg(FLG_OFF);
+            customer.setStatus(CommonUtil.isEmpty(status) ? "ACTIVE" : status); // active status
+            customer.setDelFlg("0"); // not deleted
             customer.setCrtDt(CommonUtil.getCurrentDateTimeStr());
             customer.setUpdDt(CommonUtil.getCurrentDateTimeStr());
 
             int result = customerDAO.save(customer);
-            if (result == STATUS_OK) {
+            if (result == 0) { // ok status
                 logAction("CUSTOMER_REGISTERED", "",
                           "Customer registered: " + email, request);
             }
