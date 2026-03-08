@@ -10,7 +10,7 @@ import java.sql.ResultSet;
 import java.sql.Statement;
 import java.sql.PreparedStatement;
 import java.util.concurrent.ConcurrentHashMap;
-import java.nio.charset.StandardCharsets;
+
 
 import org.hibernate.LockMode;
 import org.hibernate.Query;
