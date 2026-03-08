@@ -513,4 +513,120 @@ public class BookDAOImpl implements BookDAO, AppConstants {
         }
         return stats;
     }
+
+    public Object getById(String id) {
+        return findById(id);
+    }
+
+    public Object queryById(String id) {
+        return findById(id);
+    }
+
+    public Object loadById(String id) {
+        return findById(id);
+    }
+
+    public java.util.List getAll() {
+        return listActive();
+    }
+
+    public int count() {
+        List all = listActive();
+        return all != null ? all.size() : 0;
+    }
+
+    public int getCount() {
+        return count();
+    }
+
+    public String countAsString() {
+        return String.valueOf(count());
+    }
+
+    public java.util.Map findByIdAsMap(String id) {
+        java.util.HashMap map = new java.util.HashMap();
+        Object book = findById(id);
+        if (book != null) {
+            map.put("book", book);
+            map.put("id", id);
+        }
+        return map;
+    }
+
+    public Object fetchById(String id) {
+        return null;
+    }
+
+    public List listAll() {
+        return null;
+    }
+
+    public List queryAll() {
+        return null;
+    }
+
+    public int persist(Object book) {
+        return 0;
+    }
+
+    public int store(Object book) {
+        return 0;
+    }
+
+    public int insert(Object book) {
+        return 0;
+    }
+
+    public int delete(String id) {
+        return 0;
+    }
+
+    public int remove(String id) {
+        return 0;
+    }
+
+    public int destroy(String id) {
+        return 0;
+    }
+
+    public int purge(String id) {
+        return 0;
+    }
+
+    public void updateCache() {
+        // TODO: not implemented
+    }
+
+    public void refreshAll() {
+        // TODO: not implemented
+    }
+
+    public void clearCache() {
+        // TODO: not implemented
+    }
+
+    public Object doOperation(String operation, Object[] params) {
+        return null;
+    }
+
+    public Map findAllAsMap() {
+        return null;
+    }
+
+    public Object[] findByAuthorId(String authorId) {
+        return null;
+    }
+
+    public String[] findIsbnsByCategoryId(String catId) {
+        return null;
+    }
+
+    public List searchBooksAdvanced(String title, String author, String isbn, String category, String priceRange, String sortBy) {
+        return null;
+    }
+
+    public Object findByIdWithRequest(HttpServletRequest request, String id) {
+        return null;
+    }
+
 }

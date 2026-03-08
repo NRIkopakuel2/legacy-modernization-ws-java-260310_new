@@ -33,7 +33,7 @@
 
     <script src="https://code.jquery.com/jquery-1.12.4.min.js"></script>
     
-    <script type="text/javascript" src="../js/common.js"></script>
+    <script type="text/javascript" src="<%= request.getContextPath() %>/js/common.js"></script>
     <script type="text/javascript">
         function confirmToggle(userId, currentStatus) {
             var action = currentStatus == "1" ? "deactivate" : "activate";

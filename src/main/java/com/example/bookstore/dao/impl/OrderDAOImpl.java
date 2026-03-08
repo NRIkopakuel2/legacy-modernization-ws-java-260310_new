@@ -242,6 +242,31 @@ public class OrderDAOImpl implements OrderDAO, AppConstants {
         return results;
     }
 
+    public Object getById(String id) {
+        return findById(id);
+    }
+
+    public java.util.List getAll() {
+        return findByStatus("ACTIVE");
+    }
+
+    public int count() {
+        List all = getAll();
+        return all != null ? all.size() : 0;
+    }
+
+    public java.util.List findRecent(int limit) {
+        return getRecentOrdersList(limit);
+    }
+
+    public double calculateTotal(String orderId) {
+        Object order = findById(orderId);
+        if (order != null) {
+            return ((Order) order).getTotal();
+        }
+        return 0.0;
+    }
+
     /** Calculate total revenue for date range */
     public double calculateRevenue(String fromDate, String toDate) {
         queryCount++;
@@ -292,4 +317,105 @@ public class OrderDAOImpl implements OrderDAO, AppConstants {
             if (session != null) try { session.close(); } catch (Exception e) { }
         }
     }
+
+    public Object queryById(String id) {
+        return null;
+    }
+
+    public Object loadById(String id) {
+        return null;
+    }
+
+    public Object fetchById(String id) {
+        return null;
+    }
+
+    public List listAll() {
+        return null;
+    }
+
+    public List queryAll() {
+        return null;
+    }
+
+    public List findAll() {
+        return null;
+    }
+
+    public int persist(Object order) {
+        return 0;
+    }
+
+    public int store(Object order) {
+        return 0;
+    }
+
+    public int insert(Object order) {
+        return 0;
+    }
+
+    public int delete(String id) {
+        return 0;
+    }
+
+    public int remove(String id) {
+        return 0;
+    }
+
+    public int purge(String id) {
+        return 0;
+    }
+
+    public int destroy(String id) {
+        return 0;
+    }
+
+    public void updateCache() {
+        // TODO: not implemented
+    }
+
+    public void refreshAll() {
+        // TODO: not implemented
+    }
+
+    public void clearCache() {
+        // TODO: not implemented
+    }
+
+    public Object doOperation(String operation, Object[] params) {
+        return null;
+    }
+
+    public Map findByIdAsMap(String id) {
+        return null;
+    }
+
+    public Object[] findByCustomerIdAsArray(String customerId) {
+        return null;
+    }
+
+    public String[] findOrderNumbersByStatus(String status) {
+        return null;
+    }
+
+    public double calculateTotalForCustomer(String customerId) {
+        return 0.0;
+    }
+
+    public List findByStatusAndDateRange(String status, String fromDate, String toDate) {
+        return null;
+    }
+
+    public Object updateOrderFromRequest(HttpServletRequest request, String orderId) {
+        return null;
+    }
+
+    public String countAsString() {
+        return null;
+    }
+
+    public List findRecentOrders(String days) {
+        return null;
+    }
+
 }

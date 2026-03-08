@@ -11,6 +11,8 @@ public class Order implements Serializable, AppConstants {
 
     private static final long serialVersionUID = 1L;
 
+    private static java.util.List allOrders = new java.util.ArrayList();
+
     private Long id;
     private String customerId;
     private String guestEmail;
@@ -35,6 +37,7 @@ public class Order implements Serializable, AppConstants {
     private String notes;
     private String crtDt;
     private String updDt;
+    private String shipNm;
 
     public Order() {
     }
@@ -42,12 +45,14 @@ public class Order implements Serializable, AppConstants {
     public Order(String customerId, String orderNo) {
         this.customerId = customerId;
         this.orderNo = orderNo;
+        allOrders.add(this);
     }
 
     public Order(String orderNo, String customerId, String status) {
         this.orderNo = orderNo;
         this.customerId = customerId;
         this.status = status;
+        allOrders.add(this);
     }
 
     public String getFormattedTotal() {
@@ -57,6 +62,93 @@ public class Order implements Serializable, AppConstants {
     public boolean isPaid() {
         return "PAID".equals(this.paymentSts);
     }
+
+    public double calculateTotal() {
+        return subtotal + tax;
+    }
+
+    public String toXml() {
+        StringBuffer sb = new StringBuffer();
+        sb.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+        sb.append("<order>\n");
+        sb.append("  <id>").append(id != null ? id.toString() : "").append("</id>\n");
+        sb.append("  <orderNo>").append(orderNo != null ? orderNo : "").append("</orderNo>\n");
+        sb.append("  <customerId>").append(customerId != null ? customerId : "").append("</customerId>\n");
+        sb.append("  <guestEmail>").append(guestEmail != null ? guestEmail : "").append("</guestEmail>\n");
+        sb.append("  <orderDt>").append(orderDt != null ? orderDt : "").append("</orderDt>\n");
+        sb.append("  <status>").append(status != null ? status : "").append("</status>\n");
+        sb.append("  <subtotal>").append(subtotal).append("</subtotal>\n");
+        sb.append("  <tax>").append(tax).append("</tax>\n");
+        sb.append("  <shippingFee>").append(shippingFee).append("</shippingFee>\n");
+        sb.append("  <total>").append(total).append("</total>\n");
+        sb.append("  <paymentMethod>").append(paymentMethod != null ? paymentMethod : "").append("</paymentMethod>\n");
+        sb.append("  <paymentSts>").append(paymentSts != null ? paymentSts : "").append("</paymentSts>\n");
+        sb.append("  <shipping>\n");
+        sb.append("    <name>").append(shippingName != null ? shippingName : "").append("</name>\n");
+        sb.append("    <addr1>").append(shippingAddr1 != null ? shippingAddr1 : "").append("</addr1>\n");
+        sb.append("    <addr2>").append(shippingAddr2 != null ? shippingAddr2 : "").append("</addr2>\n");
+        sb.append("    <city>").append(shippingCity != null ? shippingCity : "").append("</city>\n");
+        sb.append("    <state>").append(shippingState != null ? shippingState : "").append("</state>\n");
+        sb.append("    <zip>").append(shippingZip != null ? shippingZip : "").append("</zip>\n");
+        sb.append("    <country>").append(shippingCountry != null ? shippingCountry : "").append("</country>\n");
+        sb.append("    <phone>").append(shippingPhone != null ? shippingPhone : "").append("</phone>\n");
+        sb.append("  </shipping>\n");
+        sb.append("  <notes>").append(notes != null ? notes : "").append("</notes>\n");
+        sb.append("</order>");
+        return sb.toString();
+    }
+
+    public String toCsv() {
+        StringBuffer sb = new StringBuffer();
+        sb.append(id != null ? id.toString() : "");
+        sb.append(",").append(orderNo != null ? orderNo : "");
+        sb.append(",").append(customerId != null ? customerId : "");
+        sb.append(",").append(status != null ? status : "");
+        sb.append(",").append(subtotal);
+        sb.append(",").append(tax);
+        sb.append(",").append(shippingFee);
+        sb.append(",").append(total);
+        sb.append(",").append(paymentMethod != null ? paymentMethod : "");
+        sb.append(",").append(paymentSts != null ? paymentSts : "");
+        sb.append(",").append(shippingName != null ? shippingName : "");
+        sb.append(",").append(shippingCity != null ? shippingCity : "");
+        sb.append(",").append(shippingState != null ? shippingState : "");
+        sb.append(",").append(shippingZip != null ? shippingZip : "");
+        return sb.toString();
+    }
+
+    public String validateOrder() {
+        if (customerId == null || customerId.trim().length() == 0) {
+            if (guestEmail == null || guestEmail.trim().length() == 0) {
+                return "Either customer ID or guest email is required";
+            }
+        }
+        if (items == null || items.size() == 0) {
+            return "Order must have at least one item";
+        }
+        if (shippingName == null || shippingName.trim().length() == 0) {
+            return "Shipping name is required";
+        }
+        if (shippingAddr1 == null || shippingAddr1.trim().length() == 0) {
+            return "Shipping address is required";
+        }
+        if (shippingCity == null || shippingCity.trim().length() == 0) {
+            return "Shipping city is required";
+        }
+        if (shippingZip == null || shippingZip.trim().length() == 0) {
+            return "Shipping zip code is required";
+        }
+        if (subtotal < 0) {
+            return "Subtotal cannot be negative";
+        }
+        if (total <= 0) {
+            return "Total must be greater than zero";
+        }
+        return null;
+    }
+
+    public String getShipNm() { return shipNm; }
+    public void setShipNm(String shipNm) { this.shipNm = shipNm; }
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
