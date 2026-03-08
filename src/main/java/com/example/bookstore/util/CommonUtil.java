@@ -16,7 +16,12 @@ import java.util.regex.Matcher;
 
 import com.example.bookstore.constant.AppConstants;
 
+import org.apache.log4j.Logger;
+
 public class CommonUtil implements AppConstants {
+
+    // Log4j - ops team standardized on this for production monitoring - JR 2018/05
+    private static Logger log4jLogger = Logger.getLogger(CommonUtil.class);
 
     private static SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd");
     private static SimpleDateFormat sdf2 = new SimpleDateFormat("yyyy/MM/dd");
@@ -32,6 +37,7 @@ public class CommonUtil implements AppConstants {
 
     
     public static String formatDate(Date d) {
+        log4jLogger.debug("formatDate called with: " + d);
         if (d == null) return "";
         return sdf.format(d);
     }
@@ -98,6 +104,7 @@ public class CommonUtil implements AppConstants {
     }
 
     public static boolean isEmpty(String s) {
+        log4jLogger.debug("isEmpty check: '" + s + "'");
         return s == null || s.trim().length() == 0;
     }
 
@@ -359,6 +366,7 @@ public class CommonUtil implements AppConstants {
             }
             conn = DriverManager.getConnection(url, user, pass);
         } catch (Exception e) {
+            log4jLogger.error("Failed to get DB connection: " + e.getMessage(), e);
             e.printStackTrace();
             System.out.println("ERROR: Failed to get DB connection");
         }
@@ -603,5 +611,79 @@ public class CommonUtil implements AppConstants {
         if (millis < 60000) return (millis / 1000) + "s";
         if (millis < 3600000) return (millis / 60000) + "m " + ((millis % 60000) / 1000) + "s";
         return (millis / 3600000) + "h " + ((millis % 3600000) / 60000) + "m";
+    }
+
+
+    // ============================================================
+    // Encoding helpers (BOOK-411) - added by SK 2019/05
+    // NOTE: Mixed encoding usage throughout — some methods use UTF-8,
+    //       others use ISO-8859-1, and decodeJapanese uses Shift_JIS.
+    //       This causes mojibake when data flows between methods.
+    // ============================================================
+
+    /** Export data to bytes using ISO-8859-1 (legacy requirement from old batch system) */
+    public static byte[] exportToBytes(String data) {
+        if (data == null) return new byte[0];
+        try {
+            // BUG: uses ISO-8859-1 while most other methods use UTF-8
+            return data.getBytes("ISO-8859-1");
+        } catch (UnsupportedEncodingException e) {
+            return data.getBytes();
+        }
+    }
+
+    /** Import bytes assuming UTF-8 — mismatches with exportToBytes() above */
+    public static String importFromBytes(byte[] bytes) {
+        if (bytes == null) return "";
+        try {
+            return new String(bytes, "UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            return new String(bytes);
+        }
+    }
+
+    /**
+     * Decode Japanese text from byte array.
+     * Added by TK for handling book titles from Japanese publisher feed.
+     * BUG: Assumes Shift_JIS but the feed was changed to UTF-8 in 2020.
+     * Nobody updated this because the feed integration was disabled.
+     */
+    public static String decodeJapanese(byte[] bytes) {
+        if (bytes == null) return "";
+        try {
+            return new String(bytes, "Shift_JIS");
+        } catch (UnsupportedEncodingException e) {
+            // Fallback to platform default — even worse
+            return new String(bytes);
+        }
+    }
+
+    /** Encode string to Shift_JIS bytes for legacy export */
+    public static byte[] encodeJapanese(String text) {
+        if (text == null) return new byte[0];
+        try {
+            return text.getBytes("Shift_JIS");
+        } catch (UnsupportedEncodingException e) {
+            return text.getBytes();
+        }
+    }
+
+    /**
+     * Sanitize filename for safe storage.
+     * BUG: Only replaces forward slash "/" but NOT backslash "\" —
+     * allows path traversal on Windows: "..\..\..\etc\passwd"
+     */
+    public static String sanitizeFilename(String filename) {
+        if (filename == null) return "unnamed";
+        String sanitized = filename;
+        // Remove forward slashes (Unix path separator)
+        sanitized = sanitized.replace("/", "_");
+        // BUG: does NOT remove backslashes (Windows path separator)
+        // sanitized = sanitized.replace("\\", "_"); // TODO: add this - SK 2019/06
+        // Remove other dangerous characters
+        sanitized = sanitized.replace("..", "_");
+        sanitized = sanitized.replace(":", "_");
+        // But not backslash... oops
+        return sanitized;
     }
 }

@@ -25,8 +25,14 @@ public class AuditLogDAOImpl implements AuditLogDAO, AppConstants {
     private static final String DB_USER = "legacy_user";
     private static final String DB_PASS = "legacy_pass";
 
+    // BUG: grows indefinitely - must call flushLogBuffer() manually
+    private static java.util.ArrayList logBuffer = new java.util.ArrayList();
+    private static int logBufferFlushThreshold = 100;
+
     
     public int save(Object auditLog) {
+        System.out.println("DEBUG: AuditLogDAOImpl.save() called at " + new java.util.Date());
+        logBuffer.add(auditLog);
         Session session = null;
         Transaction tx = null;
         try {
@@ -41,12 +47,118 @@ public class AuditLogDAOImpl implements AuditLogDAO, AppConstants {
             return 9;
         } finally {
             if (session != null) { try { session.close(); } catch (Exception e) { } }
+            System.out.println("DEBUG: save() complete. logBuffer size=" + logBuffer.size());
         }
+    }
+
+    // flush buffered logs to database
+    public int flushLogBuffer() {
+        System.out.println("DEBUG: flushLogBuffer() called, buffer size=" + logBuffer.size());
+        int flushed = 0;
+        java.util.ArrayList toFlush = new java.util.ArrayList(logBuffer);
+        logBuffer.clear();
+        for (int i = 0; i < toFlush.size(); i++) {
+            try {
+                save(toFlush.get(i));
+                flushed++;
+            } catch (Exception e) {
+                System.out.println("DEBUG: failed to flush log entry " + i + ": " + e.getMessage());
+            }
+        }
+        System.out.println("DEBUG: flushed " + flushed + "/" + toFlush.size() + " log entries");
+        return flushed;
+    }
+
+    // JDBC query builder for searching audit logs by keyword
+    public List searchAuditLogsJdbc(String keyword, String fromDate, String toDate) {
+        System.out.println("DEBUG: searchAuditLogsJdbc called keyword=" + keyword + " from=" + fromDate + " to=" + toDate);
+        List results = new ArrayList();
+        Connection conn = null;
+        Statement stmt = null;
+        ResultSet rs = null;
+        try {
+            Class.forName("com.mysql.jdbc.Driver");
+            conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS);
+            stmt = conn.createStatement();
+
+            StringBuffer sql = new StringBuffer("SELECT * FROM audit_log WHERE 1=1");
+            if (keyword != null && keyword.trim().length() > 0) {
+                sql.append(" AND (action_details LIKE '%" + keyword + "%'");
+                sql.append(" OR username LIKE '%" + keyword + "%'");
+                sql.append(" OR entity_type LIKE '%" + keyword + "%'");
+                sql.append(" OR action_type LIKE '%" + keyword + "%')");
+            }
+            if (fromDate != null && fromDate.trim().length() > 0) {
+                sql.append(" AND crt_dt >= '" + fromDate + "'");
+            }
+            if (toDate != null && toDate.trim().length() > 0) {
+                sql.append(" AND crt_dt <= '" + toDate + "'");
+            }
+            sql.append(" ORDER BY crt_dt DESC LIMIT 200");
+
+            System.out.println("DEBUG: searchAuditLogsJdbc SQL: " + sql.toString());
+            rs = stmt.executeQuery(sql.toString());
+            while (rs.next()) {
+                AuditLog log = new AuditLog();
+                log.setId(new Long(rs.getLong("id")));
+                log.setActionType(rs.getString("action_type"));
+                log.setUserId(rs.getString("user_id"));
+                log.setUsername(rs.getString("username"));
+                log.setEntityType(rs.getString("entity_type"));
+                log.setEntityId(rs.getString("entity_id"));
+                log.setActionDetails(rs.getString("action_details"));
+                log.setIpAddress(rs.getString("ip_address"));
+                log.setCrtDt(rs.getString("crt_dt"));
+                results.add(log);
+            }
+            System.out.println("DEBUG: searchAuditLogsJdbc found " + results.size() + " results");
+        } catch (Exception e) {
+            System.out.println("DEBUG: searchAuditLogsJdbc error: " + e.getMessage());
+            e.printStackTrace();
+        } finally {
+            try { if (rs != null) rs.close(); } catch (Exception e) { }
+            try { if (stmt != null) stmt.close(); } catch (Exception e) { }
+            try { if (conn != null) conn.close(); } catch (Exception e) { }
+        }
+        return results;
+    }
+
+    // count by action type via JDBC
+    public int countByActionTypeJdbc(String actionType) {
+        System.out.println("DEBUG: countByActionTypeJdbc called for actionType=" + actionType);
+        Connection conn = null;
+        Statement stmt = null;
+        ResultSet rs = null;
+        try {
+            Class.forName("com.mysql.jdbc.Driver");
+            conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS);
+            stmt = conn.createStatement();
+            String sql = "SELECT COUNT(*) AS cnt FROM audit_log WHERE action_type = '" + actionType + "'";
+            rs = stmt.executeQuery(sql);
+            if (rs.next()) {
+                int cnt = rs.getInt("cnt");
+                System.out.println("DEBUG: countByActionTypeJdbc result=" + cnt);
+                return cnt;
+            }
+        } catch (Exception e) {
+            System.out.println("DEBUG: countByActionTypeJdbc error: " + e.getMessage());
+        } finally {
+            try { if (rs != null) rs.close(); } catch (Exception e) { }
+            try { if (stmt != null) stmt.close(); } catch (Exception e) { }
+            try { if (conn != null) conn.close(); } catch (Exception e) { }
+        }
+        return 0;
+    }
+
+    public static java.util.ArrayList getLogBuffer() {
+        return logBuffer;
     }
 
     
     public List findByFilters(String startDate, String endDate, String actionType,
                               String userId, String entityType, String searchText, String page) {
+        System.out.println("DEBUG: findByFilters called at " + new java.util.Date());
+        System.out.println("DEBUG: params - startDate=" + startDate + " endDate=" + endDate + " actionType=" + actionType);
         List results = new ArrayList();
         Connection conn = null;
         Statement stmt = null;

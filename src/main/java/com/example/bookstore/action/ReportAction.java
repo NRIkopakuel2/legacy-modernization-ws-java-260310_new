@@ -20,7 +20,13 @@ import com.example.bookstore.manager.UserManager;
 import com.example.bookstore.util.CommonUtil;
 import com.example.bookstore.util.DateUtil;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
+
 public class ReportAction extends DispatchAction implements AppConstants {
+
+    // Commons Logging - reports team uses this for audit trail - MK 2020/03
+    private static Log commonsLog = LogFactory.getLog(ReportAction.class);
 
     private String lastReportType;
     private int reportCount = 0;
@@ -53,6 +59,7 @@ public class ReportAction extends DispatchAction implements AppConstants {
                                     HttpServletRequest request, HttpServletResponse response)
             throws Exception {
         reportCount++;
+        commonsLog.info("Generating daily sales report #" + reportCount);
         try {
 
             HttpSession session = request.getSession(false);
@@ -98,6 +105,7 @@ public class ReportAction extends DispatchAction implements AppConstants {
                                      HttpServletRequest request, HttpServletResponse response)
             throws Exception {
         reportCount++;
+        commonsLog.info("Generating sales-by-book report #" + reportCount);
         try {
 
             HttpSession session = request.getSession(false);

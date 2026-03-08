@@ -19,7 +19,13 @@ import com.example.bookstore.manager.BookstoreManager;
 import com.example.bookstore.manager.UserManager;
 import com.example.bookstore.util.CommonUtil;
 
+import java.util.logging.Logger;
+import java.util.logging.Level;
+
 public class InventoryAction extends DispatchAction implements AppConstants {
+
+    // JUL logger - added after stock discrepancy incident 2020/12
+    private static Logger julLogger = Logger.getLogger(InventoryAction.class.getName());
 
     private String lastAdjustedBookId;
     private int adjustCount = 0;
@@ -78,6 +84,7 @@ public class InventoryAction extends DispatchAction implements AppConstants {
 
             String bookId = request.getParameter("bookId");
             if (CommonUtil.isEmpty(bookId)) {
+                julLogger.severe("Stock detail requested with null/empty bookId!");
                 request.setAttribute(ERR, "Book ID is required");
                 return mapping.findForward("successNew");
             }
@@ -217,6 +224,7 @@ public class InventoryAction extends DispatchAction implements AppConstants {
             }
 
             if (!canAdjust) {
+                julLogger.severe("Unauthorized stock adjustment attempt by role=" + role);
                 return mapping.findForward(FWD_UNAUTHORIZED);
             }
 
@@ -250,6 +258,7 @@ public class InventoryAction extends DispatchAction implements AppConstants {
             String username = (String) session.getAttribute(USER);
 
             if (CommonUtil.isEmpty(bookId)) {
+                julLogger.severe("adjustStock called with empty bookId");
                 request.setAttribute(ERR, "Book ID is required for adjustment");
                 return mapping.findForward(FWD_SUCCESS);
             }

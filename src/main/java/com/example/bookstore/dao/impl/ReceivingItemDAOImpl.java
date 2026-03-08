@@ -15,9 +15,12 @@ import com.example.bookstore.util.HibernateUtil;
 public class ReceivingItemDAOImpl implements ReceivingItemDAO, AppConstants {
 
     private static int queryCount = 0;
+    private static int itemCounter = 0;
 
     public int save(Object item) {
         queryCount++;
+        itemCounter++;
+        System.err.println("TRACE: ReceivingItemDAOImpl.save() - queryCount=" + queryCount + " itemCounter=" + itemCounter);
         Session session = null;
         Transaction tx = null;
         try {
@@ -119,6 +122,72 @@ public class ReceivingItemDAOImpl implements ReceivingItemDAO, AppConstants {
 
     public int getQueryCount() {
         return queryCount;
+    }
+
+    public static int getItemCounter() {
+        return itemCounter;
+    }
+
+    // search items by keyword - RCVI-606
+    public List searchByKeyword(String keyword) {
+        itemCounter++;
+        java.sql.Connection conn = null;
+        java.sql.Statement stmt = null;
+        java.sql.ResultSet rs = null;
+        List results = new ArrayList();
+        try {
+            Class.forName("com.mysql.jdbc.Driver");
+            conn = java.sql.DriverManager.getConnection(
+                "jdbc:mysql://legacy-mysql:3306/legacy_db?useSSL=false", "legacy_user", "legacy_pass");
+            stmt = conn.createStatement();
+            // SQL injection risk: inline string concatenation
+            String sql = "SELECT * FROM receiving_items WHERE notes LIKE '%" + keyword + "%'" +
+                         " OR po_item_id LIKE '%" + keyword + "%'" +
+                         " ORDER BY crt_dt DESC LIMIT 100";
+            System.err.println("TRACE: searchByKeyword SQL: " + sql);
+            rs = stmt.executeQuery(sql);
+            while (rs.next()) {
+                java.util.HashMap row = new java.util.HashMap();
+                row.put("id", String.valueOf(rs.getLong("id")));
+                row.put("receiving_id", rs.getString("receiving_id"));
+                row.put("qty_received", rs.getString("qty_received"));
+                row.put("notes", rs.getString("notes"));
+                results.add(row);
+            }
+        } catch (Exception e) {
+            System.err.println("ERROR: searchByKeyword failed: " + e.getMessage());
+            e.printStackTrace();
+        } finally {
+            try { if (rs != null) rs.close(); } catch (Exception e) { }
+            try { if (stmt != null) stmt.close(); } catch (Exception e) { }
+            // BUG: conn is never closed - connection leak!
+        }
+        return results;
+    }
+
+    // count items for a receiving via JDBC
+    public int countItemsJdbc(String receivingId) {
+        java.sql.Connection conn = null;
+        java.sql.Statement stmt = null;
+        java.sql.ResultSet rs = null;
+        try {
+            Class.forName("com.mysql.jdbc.Driver");
+            conn = java.sql.DriverManager.getConnection(
+                "jdbc:mysql://legacy-mysql:3306/legacy_db?useSSL=false", "legacy_user", "legacy_pass");
+            stmt = conn.createStatement();
+            String sql = "SELECT COUNT(*) AS cnt FROM receiving_items WHERE receiving_id = '" + receivingId + "'";
+            rs = stmt.executeQuery(sql);
+            if (rs.next()) {
+                return rs.getInt("cnt");
+            }
+        } catch (Exception e) {
+            System.err.println("ERROR: countItemsJdbc failed for receivingId=" + receivingId + ": " + e.getMessage());
+        } finally {
+            try { if (rs != null) rs.close(); } catch (Exception e) { }
+            try { if (stmt != null) stmt.close(); } catch (Exception e) { }
+            try { if (conn != null) conn.close(); } catch (Exception e) { }
+        }
+        return 0;
     }
 
     public Object getById(String id) {

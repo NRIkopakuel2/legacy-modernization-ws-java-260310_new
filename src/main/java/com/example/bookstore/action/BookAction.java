@@ -17,7 +17,12 @@ import com.example.bookstore.constant.AppConstants;
 import com.example.bookstore.manager.BookstoreManager;
 import com.example.bookstore.util.CommonUtil;
 
+import org.apache.log4j.Logger;
+
 public class BookAction extends Action implements AppConstants {
+
+    // Log4j - added for search analytics tracking - analytics team 2021/01
+    private static Logger log4jLogger = Logger.getLogger(BookAction.class);
 
     private Map searchCache = new HashMap();
     private String lastSearchTerm;
@@ -80,6 +85,7 @@ public class BookAction extends Action implements AppConstants {
 
             System.out.println("BookAction searchMode=" + searchMode + " log=" + searchLog
                 + " useJdbc=" + useJdbc + " ts=" + System.currentTimeMillis());
+            log4jLogger.info("Book search initiated: mode=" + searchMode + " criteria=" + searchLog);
 
             List r = null;
 
@@ -302,6 +308,7 @@ public class BookAction extends Action implements AppConstants {
             }
 
             // Log search summary
+            log4jLogger.info("Search complete: results=" + (r != null ? r.size() : 0) + " cache=" + fromCache);
             System.out.println("BookAction search complete: mode=" + searchMode
                 + " fromCache=" + fromCache + " fallback=" + fallbackUsed
                 + " useHibernate=" + useHibernate
