@@ -1,7 +1,7 @@
 services:
   # Tomcat 6.0 with JRE 7 for Struts 1.x compatibility
   tomcat:
-    image: tomcat:6.0-jre7
+    image: tomcat:7.0-jre8
     container_name: legacy-tomcat
     ports:
       - "8080:8080"

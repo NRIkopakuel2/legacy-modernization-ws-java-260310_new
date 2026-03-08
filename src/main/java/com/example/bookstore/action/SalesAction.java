@@ -1117,7 +1117,7 @@ public class SalesAction extends DispatchAction implements AppConstants {
                 sn, sa, sc, shipState, shipZip,
                 shipCountry, shipPhone, notes, request);
 
-            try { Thread.sleep(200); } catch (InterruptedException e) { }
+            try { Thread.sleep(200); } catch (InterruptedException ie) { }
 
             if (result == 0) {
                 lastCustomerId = e;
