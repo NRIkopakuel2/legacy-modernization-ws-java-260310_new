@@ -7,6 +7,7 @@ import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.Statement;
+import java.text.NumberFormat;
 
 import org.hibernate.Query;
 import org.hibernate.Session;
@@ -17,6 +18,8 @@ import com.example.bookstore.dao.ShoppingCartDAO;
 import com.example.bookstore.util.HibernateUtil;
 
 public class ShoppingCartDAOImpl implements ShoppingCartDAO, AppConstants {
+
+    // BUG: cart items not properly cleaned up on session timeout
 
     
     public int save(Object cartItem) {

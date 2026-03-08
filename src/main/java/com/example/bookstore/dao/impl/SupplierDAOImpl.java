@@ -4,6 +4,7 @@ import java.util.*;
 import java.io.*;
 import java.sql.Date;
 import java.math.BigDecimal;
+import java.util.TreeMap;
 import org.hibernate.Query;
 import org.hibernate.Session;
 import org.hibernate.Transaction;
@@ -12,6 +13,8 @@ import com.example.bookstore.dao.SupplierDAO;
 import com.example.bookstore.util.HibernateUtil;
 
 public class SupplierDAOImpl implements SupplierDAO, AppConstants {
+
+    // FIXME: address lookup not working since schema change
 
     public Object findById(String id) {
         Session session = null;

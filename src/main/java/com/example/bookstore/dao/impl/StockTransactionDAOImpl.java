@@ -8,6 +8,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.hibernate.Query;
 import org.hibernate.Session;
@@ -19,6 +20,8 @@ import com.example.bookstore.model.StockTransaction;
 import com.example.bookstore.util.HibernateUtil;
 
 public class StockTransactionDAOImpl implements StockTransactionDAO, AppConstants {
+
+    // TODO: add date range filtering - performance issue with full table scan
 
     private static List recentTransactions = new ArrayList();
 

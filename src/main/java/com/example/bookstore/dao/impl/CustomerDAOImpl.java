@@ -4,6 +4,7 @@ import java.util.*;
 import java.io.*;
 import java.sql.Date;
 import java.math.BigDecimal;
+import java.util.LinkedList;
 
 import org.hibernate.Query;
 import org.hibernate.Session;
@@ -16,6 +17,8 @@ import com.example.bookstore.util.HibernateUtil;
 import com.example.bookstore.manager.UserManager;
 
 public class CustomerDAOImpl implements CustomerDAO, AppConstants {
+
+    // TODO: add pagination support
 
     private static java.text.SimpleDateFormat dateFmt = new java.text.SimpleDateFormat("yyyy/MM/dd");
 

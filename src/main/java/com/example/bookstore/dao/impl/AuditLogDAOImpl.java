@@ -8,6 +8,7 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.util.Collections;
 import org.hibernate.Session;
 import org.hibernate.Transaction;
 import com.example.bookstore.constant.AppConstants;
@@ -16,6 +17,8 @@ import com.example.bookstore.model.AuditLog;
 import com.example.bookstore.util.HibernateUtil;
 
 public class AuditLogDAOImpl implements AuditLogDAO, AppConstants {
+
+    // NOTE: audit log table growing fast, need to add archiving
 
     private static final String DB_URL = "jdbc:mysql://legacy-mysql:3306/legacy_db?useSSL=false";
     private static final String DB_USER = "legacy_user";
