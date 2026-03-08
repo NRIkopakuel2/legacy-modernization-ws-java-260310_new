@@ -128,4 +128,15 @@ public interface AppConstants {
 
     double DEFAULT_TAX_RATE = 10.0;
     double SHIPPING_FEE = 0.0;
+
+    // Feature flags (dead code toggles - always false/default)
+    boolean USE_NEW_CART = false;
+    boolean USE_CACHE_V2 = false;
+    boolean ENABLE_EMAIL_NOTIFICATIONS = false;
+    boolean LEGACY_MODE = true;
+    String FEATURE_AB_TEST = "control";
+
+    // File paths (Unix-style - breaks on Windows)
+    String EXPORT_PATH = "/opt/bookstore/export";
+    String BACKUP_PATH = "/opt/bookstore/backup/";
 }

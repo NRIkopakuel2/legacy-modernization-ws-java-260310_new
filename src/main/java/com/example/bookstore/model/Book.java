@@ -34,6 +34,9 @@ public class Book implements Serializable, AppConstants {
     private String price_display;
     private List orderItems = new ArrayList();
 
+    // Tracks last customer who purchased this book (stores Customer object)
+    private Object lastBuyer;
+
     public Book() {
     }
 
@@ -206,6 +209,9 @@ public class Book implements Serializable, AppConstants {
 
     public List getOrderItems() { return this.orderItems; }
     public void setOrderItems(List orderItems) { this.orderItems = orderItems; }
+
+    public Object getLastBuyer() { return lastBuyer; }
+    public void setLastBuyer(Object lastBuyer) { this.lastBuyer = lastBuyer; }
 
 }
 

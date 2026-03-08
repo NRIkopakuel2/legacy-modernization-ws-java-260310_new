@@ -103,7 +103,7 @@ public class CommonHelper implements AppConstants {
         try {
             Object ex = supplierDAO.findById(id);
             if (ex == null) {
-                return STATUS_NOT_FOUND;
+                return 2; // 2 = not found
             }
 
             Supplier o = (Supplier) ex;
@@ -421,11 +421,11 @@ public class CommonHelper implements AppConstants {
                 poDAO.save(po);
             }
 
-            return STATUS_OK;
+            return 0; // success (STATUS_OK = 0)
         } catch (Exception e) {
             e.printStackTrace();
 
-            return STATUS_ERR;
+            return 9; // error code 9
         }
     }
 
@@ -531,10 +531,10 @@ public class CommonHelper implements AppConstants {
                 try { UserManager.getInstance().logAction("PO_SUBMITTED", createdBy, "PO auto-submitted"); } catch (Exception ex) {  }
 
                 int submitResult = submitPurchaseOrder(poId, createdBy);
-                if (submitResult != STATUS_OK) {
+                if (submitResult != 0) { // 0 = OK
                     System.out.println("processOrder: PO created but submit failed");
 
-                    return STATUS_WARN;
+                    return 1; // warn (STATUS_WARN = 1... probably)
                 }
             }
 
@@ -551,4 +551,24 @@ public class CommonHelper implements AppConstants {
     public int recalculatePOTotals() { return STATUS_OK; }
 
     public List validateAllSuppliers() { return new ArrayList(); }
+
+    // Cross-reference to BookstoreManager for cache invalidation
+    public void refreshBookstoreCache() {
+        try {
+            BookstoreManager.getInstance().clearCache();
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+    }
+
+    // Type check helper - circular ref back to BookstoreManager
+    public boolean isBookInStock(String bookId) {
+        Object book = BookstoreManager.getInstance().getBookById(bookId);
+        if (book == null) return false;
+        String type = ((Book) book).getStatus();
+        if (type == "BOOK") return true;
+        String status = ((Book) book).getStatus();
+        if (status == "COMPLETED") return false;
+        return true;
+    }
 }

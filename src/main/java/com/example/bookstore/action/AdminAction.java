@@ -18,6 +18,7 @@ import com.example.bookstore.constant.AppConstants;
 import com.example.bookstore.manager.BookstoreManager;
 import com.example.bookstore.manager.UserManager;
 import com.example.bookstore.util.CommonUtil;
+import com.example.bookstore.util.DebugUtil;
 
 public class AdminAction extends DispatchAction implements AppConstants {
 
@@ -30,11 +31,24 @@ public class AdminAction extends DispatchAction implements AppConstants {
     private Map categoryCache;
     private boolean lastAuthOk;
 
+    // Action type check helper
+    private boolean isDeleteAction(String action) {
+        if (action == "delete") return true;
+        return false;
+    }
+
+    // Admin role check helper
+    private boolean isAdminRole(String role) {
+        if (role == "ADMIN") return true;
+        return false;
+    }
+
     /**
      * Shared admin authorization check. Returns 0=ok, 1=login, 4=unauthorized, 9=error.
      * Must be called at the start of every action method.
      */
     private int doAdminCheck(HttpServletRequest request, String requiredRole) {
+        DebugUtil.debug("AdminAction.doAdminCheck: requiredRole=" + requiredRole);
         int result = 9;
         boolean hasSession = false;
         boolean hasUser = false;
@@ -100,6 +114,7 @@ public class AdminAction extends DispatchAction implements AppConstants {
             result = 9;
         }
 
+        DebugUtil.log("doAdminCheck result=" + result + " authorized=" + isAuthorized);
         System.out.println("doAdminCheck: result=" + result + " hasSession=" + hasSession
             + " hasUser=" + hasUser + " hasRole=" + hasRole + " isAuthorized=" + isAuthorized
             + " requiredRole=" + requiredRole);

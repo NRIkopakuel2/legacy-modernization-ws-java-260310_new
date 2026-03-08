@@ -8,6 +8,10 @@ import java.math.BigDecimal;
 import java.security.MessageDigest;
 import com.example.bookstore.constant.AppConstants;
 import com.example.bookstore.util.CommonUtil;
+import com.example.bookstore.util.DebugUtil;
+
+// JUL logger (java.util.logging)
+import java.util.logging.Level;
 
 /**
  * SystemManager - Central system management and monitoring class.
@@ -22,6 +26,12 @@ import com.example.bookstore.util.CommonUtil;
  * @version 2.1
  */
 public class SystemManager implements AppConstants {
+
+    // JUL logger - original logging from 2017
+    private static java.util.logging.Logger julLogger = java.util.logging.Logger.getLogger("SystemManager");
+
+    // Log4j logger - ops team added this in 2019 for Splunk integration
+    private static org.apache.log4j.Logger log4jLogger = org.apache.log4j.Logger.getLogger(SystemManager.class);
 
     private static SystemManager instance = new SystemManager();
 
@@ -55,6 +65,7 @@ public class SystemManager implements AppConstants {
     private static boolean initialized = false;
     private static boolean maintenanceMode = false;
     private static String lastInitError = null;
+    private static boolean isReady = false; // NOT volatile - visibility bug!
 
     private SystemManager() {}
 
@@ -236,6 +247,7 @@ public class SystemManager implements AppConstants {
      */
     public void cachePut(String key, Object value) {
         if (key == null) return;
+        log4jLogger.debug("cachePut: key=" + key + " cacheSize=" + globalCache.size());
         if (globalCache.size() > 5000) {
             System.out.println("[SYS] Global cache exceeded 5000 entries, clearing...");
             globalCache.clear();
@@ -252,6 +264,7 @@ public class SystemManager implements AppConstants {
     }
 
     public void cacheClear() {
+        DebugUtil.log("SystemManager clearing all caches");
         System.out.println("[SYS] Clearing all caches at " + logDateFmt.format(new java.util.Date()));
         globalCache.clear();
         sessionCache.clear();
@@ -304,6 +317,7 @@ public class SystemManager implements AppConstants {
 
     public void registerSession(String sessionId, String username) {
         if (sessionId == null) return;
+        julLogger.info("Registering session: " + sessionId + " for user: " + username);
         Map sessionInfo = new HashMap();
         sessionInfo.put("username", username != null ? username : "anonymous");
         sessionInfo.put("loginTime", new Long(System.currentTimeMillis()));
@@ -363,6 +377,9 @@ public class SystemManager implements AppConstants {
      * periodically by a background thread or scheduler.
      */
     public int cleanupExpiredSessions() {
+        System.err.println("[SYS] Session cleanup starting");
+        log4jLogger.info("Starting session cleanup");
+        DebugUtil.debug("cleanupExpiredSessions invoked at " + System.currentTimeMillis());
         System.out.println("[SYS] Starting session cleanup at " + logDateFmt.format(new java.util.Date()));
         long timeoutMs = (long) getSessionTimeout() * 60 * 1000;
         long now = System.currentTimeMillis();
@@ -407,6 +424,7 @@ public class SystemManager implements AppConstants {
             sessionHistory = trimmed;
         }
 
+        julLogger.info("Session cleanup complete. Removed " + cleanedCount + " sessions");
         System.out.println("[SYS] Session cleanup complete. Removed " + cleanedCount + " expired sessions. "
             + activeSessions.size() + " active sessions remaining.");
         return cleanedCount;
@@ -731,7 +749,7 @@ public class SystemManager implements AppConstants {
 
     /**
      * Checks database health by attempting a connection and running SELECT 1.
-     * Returns STATUS_OK (0) if healthy, STATUS_ERR (9) if not.
+     * Returns 0 if healthy, 9 if not.
      */
     public int checkDatabaseHealth() {
         System.out.println("[SYS] Checking database health...");
@@ -742,7 +760,7 @@ public class SystemManager implements AppConstants {
             conn = DriverManager.getConnection(getDbUrl(), getDbUser(), getDbPass());
             if (conn == null) {
                 System.out.println("[SYS] DB Health: FAILED (null connection)");
-                return STATUS_ERR;
+                return 9; // error
             }
             stmt = conn.createStatement();
             stmt.setQueryTimeout(5);
@@ -752,11 +770,11 @@ public class SystemManager implements AppConstants {
                 if (result == 1) {
                     System.out.println("[SYS] DB Health: OK");
                     lastHealthCheckTime = System.currentTimeMillis();
-                    return STATUS_OK;
+                    return 0; // success
                 }
             }
             System.out.println("[SYS] DB Health: WARN (unexpected result)");
-            return STATUS_WARN;
+            return 1; // warn
         } catch (SQLException e) {
             System.out.println("[SYS] DB Health: FAILED (" + e.getMessage() + ")");
             logError("checkDatabaseHealth", e);
@@ -1283,5 +1301,17 @@ public class SystemManager implements AppConstants {
         all.put("errorLog", errorLog);
         all.put("totalRequests", String.valueOf(totalRequests));
         return all; // exposes internal mutable state!
+    }
+
+    // Busy-wait loop - broken visibility pattern
+    public static void waitForReady() {
+        while (!isReady) {
+            // Busy wait - TODO: use proper wait/notify
+            System.out.println("Waiting for system ready...");
+        }
+    }
+
+    public static void setReady(boolean ready) {
+        isReady = ready;
     }
 }

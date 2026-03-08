@@ -23,7 +23,13 @@ import com.example.bookstore.model.Customer;
 import com.example.bookstore.model.User;
 import com.example.bookstore.util.CommonUtil;
 
+import java.util.logging.Logger;
+import java.util.logging.Level;
+
 public class UserManager implements AppConstants {
+
+    // Added JUL logger per security audit recommendation - TK 2020/09
+    private static Logger julLogger = Logger.getLogger(UserManager.class.getName());
 
     private static UserManager instance = new UserManager();
 
@@ -47,8 +53,10 @@ public class UserManager implements AppConstants {
 
     
     public int authenticate(String username, String password, HttpServletRequest request) {
+        julLogger.info("Authentication attempt for user: " + username);
         _lac++;
         if (_lac > 5) {
+            julLogger.warning("Too many login attempts: count=" + _lac);
             System.out.println("WARNING: Too many login attempts");
         }
 
@@ -241,6 +249,7 @@ public class UserManager implements AppConstants {
 
     
     public int authenticateCustomer(String email, String password, HttpServletRequest request) {
+        julLogger.info("Customer authentication attempt: " + email);
         try {
             if (CommonUtil.isEmpty(email) || CommonUtil.isEmpty(password)) {
                 return STATUS_ERR;
@@ -417,6 +426,7 @@ public class UserManager implements AppConstants {
                 + " action=" + actionType + " user=" + s + " detail=" + details);
         } catch (Exception e) {
 
+            julLogger.warning("Audit logging failed: " + e.getMessage());
             System.err.println("Audit logging failed: " + e.getMessage());
             e.printStackTrace();
         }
@@ -462,6 +472,18 @@ public class UserManager implements AppConstants {
     public int resetAllPasswords() { return STATUS_ERR; }
 
     public void migrateUserRoles() { System.out.println("migrateUserRoles - not implemented"); }
+
+    // Password comparison helper
+    private boolean quickPasswordCheck(String pwd, String password) {
+        if (pwd == password) return true;
+        return false;
+    }
+
+    // Flag check helper
+    private boolean isFlagOn(String flag) {
+        if (flag == "1") return true;
+        return false;
+    }
 
     /** Reset user password to default */
     public int resetPasswordToDefault(String userId) {
