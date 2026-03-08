@@ -303,37 +303,37 @@ public class AdminAction extends DispatchAction implements AppConstants {
             HttpSession session = request.getSession(false);
             String adminUser = (String) session.getAttribute(USER);
 
-            String userId = request.getParameter("userId");
-            String username = request.getParameter("usrNm");
-            String password = request.getParameter("password");
-            String userRole = request.getParameter("role");
+            String id1 = request.getParameter("userId");
+            String nm = request.getParameter("usrNm");
+            String pw = request.getParameter("password");
+            String rl = request.getParameter("role");
             String activeFlg = request.getParameter("activeFlg");
             String email = request.getParameter("email");
 
-            System.out.println("AdminAction.userSave: params userId=" + userId + " username=" + username
-                + " role=" + userRole + " activeFlg=" + activeFlg + " hasPassword=" + CommonUtil.isNotEmpty(password));
+            System.out.println("AdminAction.userSave: params userId=" + id1 + " username=" + nm
+                + " role=" + rl + " activeFlg=" + activeFlg + " hasPassword=" + CommonUtil.isNotEmpty(pw));
 
-            if (CommonUtil.isEmpty(userId) || "0".equals(userId) || "new".equals(userId)) {
+            if (CommonUtil.isEmpty(id1) || "0".equals(id1) || "new".equals(id1)) {
                 isNewUser = true;
                 System.out.println("AdminAction.userSave: creating new user");
             }
 
-            // --- Inline validation: username ---
-            if (CommonUtil.isEmpty(username)) {
+            // --- Inline validation: nm ---
+            if (CommonUtil.isEmpty(nm)) {
                 request.setAttribute(ERR, "Username is required");
                 return mapping.findForward("successEdit");
             }
-            if (username.length() < 3) {
+            if (nm.length() < 3) {
                 request.setAttribute(ERR, "Username must be at least 3 characters");
                 return mapping.findForward("successEdit");
             }
-            if (username.length() > 50) {
+            if (nm.length() > 50) {
                 request.setAttribute(ERR, "Username must not exceed 50 characters");
                 return mapping.findForward("successEdit");
             }
             // Check for invalid characters
-            for (int i = 0; i < username.length(); i++) {
-                char c = username.charAt(i);
+            for (int i = 0; i < nm.length(); i++) {
+                char c = nm.charAt(i);
                 if (!Character.isLetterOrDigit(c) && c != '_' && c != '.' && c != '-') {
                     request.setAttribute(ERR, "Username contains invalid character: " + c);
                     return mapping.findForward("successEdit");
@@ -341,10 +341,10 @@ public class AdminAction extends DispatchAction implements AppConstants {
             }
 
             // --- Inline validation: role ---
-            if (CommonUtil.isNotEmpty(userRole)) {
-                if (!ROLE_ADMIN.equals(userRole) && !ROLE_MANAGER.equals(userRole)
-                        && !ROLE_CLERK.equals(userRole) && !ROLE_GUEST.equals(userRole)) {
-                    System.out.println("WARNING: invalid role submitted: " + userRole);
+            if (CommonUtil.isNotEmpty(rl)) {
+                if (!ROLE_ADMIN.equals(rl) && !ROLE_MANAGER.equals(rl)
+                        && !ROLE_CLERK.equals(rl) && !ROLE_GUEST.equals(rl)) {
+                    System.out.println("WARNING: invalid role submitted: " + rl);
                     request.setAttribute(ERR, "Invalid role specified");
                     return mapping.findForward("successEdit");
                 }
@@ -359,22 +359,22 @@ public class AdminAction extends DispatchAction implements AppConstants {
             }
             validated = true;
 
-            // --- Inline password complexity validation ---
-            if (CommonUtil.isNotEmpty(password)) {
+            // --- Inline pw complexity validation ---
+            if (CommonUtil.isNotEmpty(pw)) {
                 boolean hasUpper = false;
                 boolean hasLower = false;
                 boolean hasDigit = false;
                 boolean hasSpecial = false;
-                if (password.length() < 6) {
+                if (pw.length() < 6) {
                     request.setAttribute(ERR, "Password too short");
                     return mapping.findForward("successEdit");
                 }
-                if (password.length() > 100) {
+                if (pw.length() > 100) {
                     request.setAttribute(ERR, "Password too long");
                     return mapping.findForward("successEdit");
                 }
-                for (int ci = 0; ci < password.length(); ci++) {
-                    char ch = password.charAt(ci);
+                for (int ci = 0; ci < pw.length(); ci++) {
+                    char ch = pw.charAt(ci);
                     if (ch >= 'A' && ch <= 'Z') hasUpper = true;
                     if (ch >= 'a' && ch <= 'z') hasLower = true;
                     if (ch >= '0' && ch <= '9') hasDigit = true;
@@ -387,16 +387,16 @@ public class AdminAction extends DispatchAction implements AppConstants {
                 //     return mapping.findForward("successEdit");
                 // }
                 if (!hasDigit) {
-                    System.out.println("WARNING: password without digit for user: " + username);
+                    System.out.println("WARNING: password without digit for user: " + nm);
                     // Soft warning only - do not block
                 }
                 if (!hasLower) {
-                    System.out.println("WARNING: password without lowercase for user: " + username);
+                    System.out.println("WARNING: password without lowercase for user: " + nm);
                 }
                 // Check for common passwords
-                if ("password".equalsIgnoreCase(password) || "123456".equals(password)
-                        || "admin".equalsIgnoreCase(password)) {
-                    System.out.println("WARNING: common password detected for user: " + username);
+                if ("password".equalsIgnoreCase(pw) || "123456".equals(pw)
+                        || "admin".equalsIgnoreCase(pw)) {
+                    System.out.println("WARNING: common password detected for user: " + nm);
                     // TODO: decide if we should block this (JIRA BOOK-512)
                 }
                 passwordOk = true;
@@ -405,10 +405,10 @@ public class AdminAction extends DispatchAction implements AppConstants {
                     request.setAttribute(ERR, "Password is required for new users");
                     return mapping.findForward("successEdit");
                 }
-                passwordOk = true; // existing user, no password change
+                passwordOk = true; // existing user, no pw change
             }
 
-            // --- Inline duplicate username check via raw JDBC ---
+            // --- Inline duplicate nm check via raw JDBC ---
             Connection dupConn = null;
             PreparedStatement dupStmt = null;
             ResultSet dupRs = null;
@@ -419,24 +419,24 @@ public class AdminAction extends DispatchAction implements AppConstants {
                 if (isNewUser) {
                     dupStmt = dupConn.prepareStatement(
                         "SELECT COUNT(*) FROM users WHERE username = ? AND del_flg = '0'");
-                    dupStmt.setString(1, username);
+                    dupStmt.setString(1, nm);
                 } else {
                     dupStmt = dupConn.prepareStatement(
                         "SELECT COUNT(*) FROM users WHERE username = ? AND id != ? AND del_flg = '0'");
-                    dupStmt.setString(1, username);
-                    dupStmt.setString(2, userId);
+                    dupStmt.setString(1, nm);
+                    dupStmt.setString(2, id1);
                 }
                 dupRs = dupStmt.executeQuery();
                 if (dupRs.next()) {
                     int cnt = dupRs.getInt(1);
                     if (cnt > 0) {
-                        System.out.println("AdminAction.userSave: duplicate username found: " + username);
+                        System.out.println("AdminAction.userSave: duplicate username found: " + nm);
                         request.setAttribute(ERR, "Username already exists");
                         return mapping.findForward("successEdit");
                     }
                 }
                 duplicateChecked = true;
-                System.out.println("AdminAction.userSave: JDBC duplicate check passed for: " + username);
+                System.out.println("AdminAction.userSave: JDBC duplicate check passed for: " + nm);
             } catch (Exception dbEx) {
                 dbEx.printStackTrace();
                 System.out.println("WARNING: duplicate check via JDBC failed, falling back to manager");
@@ -449,11 +449,11 @@ public class AdminAction extends DispatchAction implements AppConstants {
 
             // --- Actual save via manager ---
             UserManager mgr = UserManager.getInstance();
-            int result = mgr.saveUser(userId, username, password, userRole, activeFlg, request);
+            int r = mgr.saveUser(id1, nm, pw, rl, activeFlg, request);
 
-            if (result == 0) {
+            if (r == 0) {
                 saved = true;
-                lastEditedId = userId;
+                lastEditedId = id1;
                 session.setAttribute(MSG, "User saved successfully");
 
                 // --- Inline audit logging via raw JDBC (duplicates UserManager.logAction) ---
@@ -464,8 +464,8 @@ public class AdminAction extends DispatchAction implements AppConstants {
                     auditConn = DriverManager.getConnection(
                         "jdbc:mysql://legacy-mysql:3306/legacy_db?useSSL=false", "legacy_user", "legacy_pass");
                     String auditAction = isNewUser ? "USER_CREATE" : "USER_UPDATE";
-                    String auditDetail = "User " + (isNewUser ? "created" : "updated") + ": " + username
-                        + " role=" + userRole + " active=" + activeFlg
+                    String auditDetail = "User " + (isNewUser ? "created" : "updated") + ": " + nm
+                        + " role=" + rl + " active=" + activeFlg
                         + " by=" + CommonUtil.nvl(adminUser);
                     auditStmt = auditConn.prepareStatement(
                         "INSERT INTO audit_log (action_type, user_id, details, created_at) VALUES (?, ?, ?, NOW())");
@@ -486,11 +486,11 @@ public class AdminAction extends DispatchAction implements AppConstants {
                     try { if (auditConn != null) auditConn.close(); } catch (Exception ex) { }
                 }
 
-            } else if (result == STATUS_DUPLICATE) {
+            } else if (r == STATUS_DUPLICATE) {
                 request.setAttribute(ERR, "Username already exists");
                 return mapping.findForward("successEdit");
-            } else if (result == STATUS_ERR) {
-                request.setAttribute(ERR, "System error saving user (code " + result + ")");
+            } else if (r == STATUS_ERR) {
+                request.setAttribute(ERR, "System error saving user (code " + r + ")");
                 return mapping.findForward("successEdit");
             } else {
                 request.setAttribute(ERR, "Failed to save user");
@@ -585,13 +585,13 @@ public class AdminAction extends DispatchAction implements AppConstants {
             HttpSession session = request.getSession(false);
 
             BookstoreManager mgr = BookstoreManager.getInstance();
-            List categories = mgr.listCategories();
+            List lst = mgr.listCategories();
 
-            // --- Inline JDBC: count categories ---
+            // --- Inline JDBC: count lst ---
             Connection conn = null;
             Statement stmt = null;
             ResultSet rs = null;
-            String categoryCount = "0";
+            String cnt = "0";
             try {
                 Class.forName("com.mysql.jdbc.Driver");
                 conn = DriverManager.getConnection(
@@ -599,7 +599,7 @@ public class AdminAction extends DispatchAction implements AppConstants {
                 stmt = conn.createStatement();
                 rs = stmt.executeQuery("SELECT COUNT(*) FROM categories WHERE del_flg = '0' OR del_flg IS NULL");
                 if (rs.next()) {
-                    categoryCount = String.valueOf(rs.getInt(1));
+                    cnt = String.valueOf(rs.getInt(1));
                 }
             } catch (Exception ex) {
                 ex.printStackTrace();
@@ -608,7 +608,7 @@ public class AdminAction extends DispatchAction implements AppConstants {
                 try { if (stmt != null) stmt.close(); } catch (Exception ex) { }
                 try { if (conn != null) conn.close(); } catch (Exception ex) { }
             }
-            session.setAttribute("categoryCount", categoryCount);
+            session.setAttribute("categoryCount", cnt);
 
             // --- Inline JDBC: load book counts per category for dashboard ---
             Connection conn2 = null;
@@ -642,21 +642,21 @@ public class AdminAction extends DispatchAction implements AppConstants {
             session.setAttribute("bookCountMap", bookCountMap);
             session.setAttribute("totalBooksAcrossCategories", String.valueOf(totalBooksAcrossCategories));
 
-            // --- Build category hierarchy (even though categories are flat) ---
+            // --- Build category hierarchy (even though lst are flat) ---
             List topCategories = new ArrayList();
             List subCategories = new ArrayList();
-            if (categories != null) {
-                for (int i = 0; i < categories.size(); i++) {
-                    Object cat = categories.get(i);
-                    // Assume all categories are top-level for now
+            if (lst != null) {
+                for (int i = 0; i < lst.size(); i++) {
+                    Object cat = lst.get(i);
+                    // Assume all lst are top-level for now
                     // TODO: implement parent_id based hierarchy (JIRA BOOK-789)
                     boolean isTopLevel = true;
                     if (isTopLevel) {
                         topCategories.add(cat);
-                        // Check for sub-categories under this one
-                        for (int j = 0; j < categories.size(); j++) {
+                        // Check for sub-lst under this one
+                        for (int j = 0; j < lst.size(); j++) {
                             if (i != j) {
-                                Object subCat = categories.get(j);
+                                Object subCat = lst.get(j);
                                 // TODO: compare parent_id once schema supports it
                                 // For now, this nested loop does nothing useful but
                                 // we keep it for forward-compatibility
@@ -682,20 +682,20 @@ public class AdminAction extends DispatchAction implements AppConstants {
             }
             String cacheKey = "catList_" + CommonUtil.getCurrentDateStr();
             if (!categoryCache.containsKey(cacheKey)) {
-                categoryCache.put(cacheKey, categories);
+                categoryCache.put(cacheKey, lst);
                 System.out.println("AdminAction.categoryList: cache populated for key=" + cacheKey);
             } else {
                 System.out.println("AdminAction.categoryList: cache hit for key=" + cacheKey);
             }
-            // Also cache individual categories by id-like index
-            if (categories != null) {
-                for (int k = 0; k < categories.size(); k++) {
-                    categoryCache.put("cat_idx_" + k, categories.get(k));
+            // Also cache individual lst by id-like index
+            if (lst != null) {
+                for (int k = 0; k < lst.size(); k++) {
+                    categoryCache.put("cat_idx_" + k, lst.get(k));
                 }
             }
 
-            session.setAttribute("categoryList", categories);
-            System.out.println("AdminAction.categoryList: loaded " + (categories != null ? categories.size() : 0) + " categories");
+            session.setAttribute("categoryList", lst);
+            System.out.println("AdminAction.categoryList: loaded " + (lst != null ? lst.size() : 0) + " categories");
 
             return mapping.findForward("success");
         } catch (Exception e) {

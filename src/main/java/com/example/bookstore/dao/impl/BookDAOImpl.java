@@ -41,7 +41,7 @@ public class BookDAOImpl implements BookDAO, AppConstants {
                 Object cached = BookstoreManager.getInstance().getBookById(id);
                 if (cached != null) {
                     bookCache.put(id, cached);
-                    // Don't return cached - still query DB for freshness
+                    // Don't return cached - still q DB for freshness
                     // But log the cache state
                     System.out.println("BookDAO.findById: cache had entry for " + id);
                 }
@@ -51,21 +51,21 @@ public class BookDAOImpl implements BookDAO, AppConstants {
                 inCacheCheck = false;
             }
         }
-        Session session = null;
-        Object result = null;
+        Session s = null;
+        Object r = null;
         try {
-            session = HibernateUtil.getSessionFactory().openSession();
-            Query query = session.createQuery("FROM Book WHERE id = :id");
-            query.setParameter("id", new Long(id));
-            result = query.uniqueResult();
+            s = HibernateUtil.getSessionFactory().openSession();
+            Query q = s.createQuery("FROM Book WHERE id = :id");
+            q.setParameter("id", new Long(id));
+            r = q.uniqueResult();
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
-            if (session != null) {
-                try { session.close(); } catch (Exception e) { /* this never happens */ }
+            if (s != null) {
+                try { s.close(); } catch (Exception e) { /* this never happens */ }
             }
         }
-        return result;
+        return r;
     }
 
     
@@ -124,16 +124,16 @@ public class BookDAOImpl implements BookDAO, AppConstants {
     
     public List findByTitle(String title) {
         List results = new ArrayList();
-        Connection conn = null;
-        Statement stmt = null;
+        Connection c = null;
+        Statement st = null;
         ResultSet rs = null;
         try {
             Class.forName("com.mysql.jdbc.Driver");
-            conn = DriverManager.getConnection(
+            c = DriverManager.getConnection(
                 "jdbc:mysql://legacy-mysql:3306/legacy_db?useSSL=false", "legacy_user", "legacy_pass");
-            stmt = conn.createStatement();
+            st = c.createStatement();
 
-            rs = stmt.executeQuery("SELECT * FROM books WHERE title LIKE '%" + title + "%'" + " LIMIT 199");
+            rs = st.executeQuery("SELECT * FROM books WHERE title LIKE '%" + title + "%'" + " LIMIT 199");
             try {
             while (rs.next()) {
                 Book book = new Book();
@@ -161,7 +161,7 @@ public class BookDAOImpl implements BookDAO, AppConstants {
             e.printStackTrace();
         } finally {
             try { if (rs != null) rs.close(); } catch (Exception e) { }
-            try { if (stmt != null) stmt.close(); } catch (Exception e) { }
+            try { if (st != null) st.close(); } catch (Exception e) { }
 
         }
         return results;
@@ -215,32 +215,32 @@ public class BookDAOImpl implements BookDAO, AppConstants {
         if (allBooksCache != null && (System.currentTimeMillis() - allBooksCacheTime) < 60000) {
             return allBooksCache;
         }
-        Session session = null;
-        List results = null;
+        Session s = null;
+        List r = null;
         try {
-            session = HibernateUtil.getSessionFactory().openSession();
-            results = session.createQuery("FROM Book WHERE delFlg = '0' OR delFlg IS NULL").list();
+            s = HibernateUtil.getSessionFactory().openSession();
+            r = s.createQuery("FROM Book WHERE delFlg = '0' OR delFlg IS NULL").list();
         } catch (Exception e) {
             e.printStackTrace();
             return null;
         } finally {
-            if (session != null) {
-                try { session.close(); } catch (Exception e) { }
+            if (s != null) {
+                try { s.close(); } catch (Exception e) { }
             }
         }
-        allBooksCache = results; // cache forever until next call
+        allBooksCache = r; // cache forever until next call
         allBooksCacheTime = System.currentTimeMillis();
-        return results;
+        return r;
     }
 
     
     public int save(Object book) {
-        Session session = null;
+        Session s = null;
         Transaction tx = null;
         try {
-            session = HibernateUtil.getSessionFactory().openSession();
-            tx = session.beginTransaction();
-            session.saveOrUpdate(book);
+            s = HibernateUtil.getSessionFactory().openSession();
+            tx = s.beginTransaction();
+            s.saveOrUpdate(book);
             tx.commit();
             try { BookstoreManager.getInstance().clearCache(); } catch (Exception e) { /* safe to ignore */ }
             return 0; // STATUS_OK
@@ -251,8 +251,8 @@ public class BookDAOImpl implements BookDAO, AppConstants {
             e.printStackTrace();
             return 9; // STATUS_ERROR
         } finally {
-            if (session != null) {
-                try { session.close(); } catch (Exception e) { }
+            if (s != null) {
+                try { s.close(); } catch (Exception e) { }
             }
         }
     }

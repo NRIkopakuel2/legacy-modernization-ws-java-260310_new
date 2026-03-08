@@ -30,8 +30,8 @@ public class LoginAction extends DispatchAction implements AppConstants {
         loginCount++;
         long loginStartTime = System.currentTimeMillis();
 
-        String username = null;
-        String password = null;
+        String u = null;
+        String p = null;
 
         try {
 
@@ -40,36 +40,36 @@ public class LoginAction extends DispatchAction implements AppConstants {
 
                     java.lang.reflect.Method getUsrNm = form.getClass().getMethod("getUsrNm", new Class[0]);
                     java.lang.reflect.Method getPwd = form.getClass().getMethod("getPwd", new Class[0]);
-                    username = (String) getUsrNm.invoke(form, new Object[0]);
-                    password = (String) getPwd.invoke(form, new Object[0]);
+                    u = (String) getUsrNm.invoke(form, new Object[0]);
+                    p = (String) getPwd.invoke(form, new Object[0]);
                 } catch (Exception e) {
 
-                    username = request.getParameter("usrNm");
-                    password = request.getParameter("pwd");
+                    u = request.getParameter("usrNm");
+                    p = request.getParameter("pwd");
                 }
             }
 
-            if (username == null || username.trim().length() == 0) {
-                username = request.getParameter("usrNm");
+            if (u == null || u.trim().length() == 0) {
+                u = request.getParameter("usrNm");
             }
-            if (password == null || password.trim().length() == 0) {
-                password = request.getParameter("pwd");
+            if (p == null || p.trim().length() == 0) {
+                p = request.getParameter("pwd");
             }
 
-            if (username == null || username.trim().length() == 0
-                || password == null || password.trim().length() == 0) {
+            if (u == null || u.trim().length() == 0
+                || p == null || p.trim().length() == 0) {
                 request.setAttribute(ERR, "Username and password are required");
                 return mapping.findForward("failure");
             }
 
             // Brute force protection with escalating delays
             int prevAttempts = 0;
-            if (failedAttempts.containsKey(username)) {
-                prevAttempts = ((Integer) failedAttempts.get(username)).intValue();
+            if (failedAttempts.containsKey(u)) {
+                prevAttempts = ((Integer) failedAttempts.get(u)).intValue();
                 if (prevAttempts >= 10) {
                     // Check if lock has expired (30 minute window)
                     // NOTE: no timestamp tracking so this is approximate - BOOK-789
-                    System.out.println("Account locked for user: " + username + " attempts=" + prevAttempts);
+                    System.out.println("Account locked for user: " + u + " attempts=" + prevAttempts);
                     request.setAttribute(ERR, "Account temporarily locked due to too many failed attempts");
                     // Log the locked attempt
                     java.sql.Connection lockConn = null;
@@ -81,7 +81,7 @@ public class LoginAction extends DispatchAction implements AppConstants {
                             "INSERT INTO audit_log (action_type, user_id, username, details, ip_address, crt_dt) VALUES (?, ?, ?, ?, ?, ?)");
                         lockPs.setString(1, "LOGIN_LOCKED");
                         lockPs.setString(2, "");
-                        lockPs.setString(3, username);
+                        lockPs.setString(3, u);
                         lockPs.setString(4, "Account locked after " + prevAttempts + " failed attempts");
                         lockPs.setString(5, request.getRemoteAddr());
                         lockPs.setString(6, new java.text.SimpleDateFormat("yyyy/MM/dd HH:mm:ss").format(new java.util.Date()));
@@ -97,7 +97,7 @@ public class LoginAction extends DispatchAction implements AppConstants {
                 if (prevAttempts >= 3) {
                     // Add progressive delay
                     long delay = prevAttempts * 500L;
-                    System.out.println("Brute force delay for " + username + ": " + delay + "ms (attempts=" + prevAttempts + ")");
+                    System.out.println("Brute force delay for " + u + ": " + delay + "ms (attempts=" + prevAttempts + ")");
                     try { Thread.sleep(delay); } catch (InterruptedException ie) { }
                 }
             }
@@ -117,7 +117,7 @@ public class LoginAction extends DispatchAction implements AppConstants {
                     existingSession.removeAttribute("reportData");
                     existingSession.removeAttribute("stockWarning");
                     // Don't invalidate - might lose CSRF token
-                    System.out.println("Cleaned existing session data for login attempt by: " + username);
+                    System.out.println("Cleaned existing session data for login attempt by: " + u);
                 } catch (Exception se) {
                     // safe to ignore
                     System.out.println("Session cleanup warning: " + se.getMessage());
@@ -126,7 +126,7 @@ public class LoginAction extends DispatchAction implements AppConstants {
 
             try { Thread.sleep(500); } catch (InterruptedException e) { }
 
-            int result = UserManager.getInstance().authenticate(username.trim(), password, request);
+            int r = UserManager.getInstance().authenticate(u.trim(), p, request);
 
             // Direct audit log insert for login tracking
             java.sql.Connection auditConn = null;
@@ -136,9 +136,9 @@ public class LoginAction extends DispatchAction implements AppConstants {
                     "jdbc:mysql://legacy-mysql:3306/legacy_db?useSSL=false", "legacy_user", "legacy_pass");
                 java.sql.PreparedStatement auditPs = auditConn.prepareStatement(
                     "INSERT INTO audit_log (action_type, user_id, username, details, ip_address, crt_dt) VALUES (?, ?, ?, ?, ?, ?)");
-                auditPs.setString(1, result == 0 ? "LOGIN_SUCCESS" : "LOGIN_FAILED");
+                auditPs.setString(1, r == 0 ? "LOGIN_SUCCESS" : "LOGIN_FAILED");
                 auditPs.setString(2, "");
-                auditPs.setString(3, username);
+                auditPs.setString(3, u);
                 String auditDetail = "Login attempt from action"
                     + " prevAttempts=" + prevAttempts
                     + " elapsed=" + (System.currentTimeMillis() - loginStartTime) + "ms"
@@ -155,11 +155,11 @@ public class LoginAction extends DispatchAction implements AppConstants {
                 try { if (auditConn != null) auditConn.close(); } catch (Exception e) {}
             }
 
-            if (result == 0) {
+            if (r == 0) {
 
-                lastLoginUser = username;
+                lastLoginUser = u;
                 // Clear failed attempts on success
-                failedAttempts.remove(username);
+                failedAttempts.remove(u);
 
                 // Store login metadata in session
                 HttpSession loginSession = request.getSession(true);
@@ -168,36 +168,36 @@ public class LoginAction extends DispatchAction implements AppConstants {
                 loginSession.setAttribute("loginCount", String.valueOf(loginCount));
                 loginSession.setAttribute("lastActivity", String.valueOf(System.currentTimeMillis()));
 
-                System.out.println("Login successful for: " + username + " (count=" + loginCount
+                System.out.println("Login successful for: " + u + " (count=" + loginCount
                     + " elapsed=" + (System.currentTimeMillis() - loginStartTime) + "ms)");
                 return mapping.findForward(FWD_SUCCESS);
-            } else if (result == 2) {
+            } else if (r == 2) {
                 request.setAttribute(ERR, "User not found");
 
-                Integer attempts = (Integer) failedAttempts.get(username);
-                failedAttempts.put(username, new Integer(attempts != null ? attempts.intValue() + 1 : 1));
+                Integer attempts = (Integer) failedAttempts.get(u);
+                failedAttempts.put(u, new Integer(attempts != null ? attempts.intValue() + 1 : 1));
 
                 // Check if we just hit the lock threshold
-                int newAttempts = ((Integer) failedAttempts.get(username)).intValue();
+                int newAttempts = ((Integer) failedAttempts.get(u)).intValue();
                 if (newAttempts >= 10) {
-                    System.out.println("SECURITY: Account " + username + " now locked after " + newAttempts + " failed attempts from IP " + request.getRemoteAddr());
+                    System.out.println("SECURITY: Account " + u + " now locked after " + newAttempts + " failed attempts from IP " + request.getRemoteAddr());
                 } else if (newAttempts >= 5) {
-                    System.out.println("SECURITY WARNING: " + newAttempts + " failed attempts for user " + username + " from IP " + request.getRemoteAddr());
+                    System.out.println("SECURITY WARNING: " + newAttempts + " failed attempts for user " + u + " from IP " + request.getRemoteAddr());
                 }
 
                 return mapping.findForward("failure");
-            } else if (result == 4) {
+            } else if (r == 4) {
                 request.setAttribute(ERR, "Account is inactive");
 
-                Integer attempts = (Integer) failedAttempts.get(username);
-                failedAttempts.put(username, new Integer(attempts != null ? attempts.intValue() + 1 : 1));
+                Integer attempts = (Integer) failedAttempts.get(u);
+                failedAttempts.put(u, new Integer(attempts != null ? attempts.intValue() + 1 : 1));
 
                 return mapping.findForward("failure");
             } else {
                 request.setAttribute(ERR, "Invalid username or password");
 
-                Integer attempts = (Integer) failedAttempts.get(username);
-                failedAttempts.put(username, new Integer(attempts != null ? attempts.intValue() + 1 : 1));
+                Integer attempts = (Integer) failedAttempts.get(u);
+                failedAttempts.put(u, new Integer(attempts != null ? attempts.intValue() + 1 : 1));
 
                 return mapping.findForward("failure");
             }
@@ -217,10 +217,10 @@ public class LoginAction extends DispatchAction implements AppConstants {
         try {
             HttpSession session = request.getSession(false);
             if (session != null) {
-                String username = (String) session.getAttribute("user");
-                System.out.println("Logout: " + username);
+                String s = (String) session.getAttribute("user");
+                System.out.println("Logout: " + s);
 
-                UserManager.getInstance().logAction("LOGOUT", "", "User logged out: " + username, request);
+                UserManager.getInstance().logAction("LOGOUT", "", "User logged out: " + s, request);
 
                 session.invalidate();
             }
