@@ -76,7 +76,7 @@ public class LoginAction extends DispatchAction implements AppConstants {
                     try {
                         Class.forName("com.mysql.jdbc.Driver");
                         lockConn = java.sql.DriverManager.getConnection(
-                            "jdbc:mysql://legacy-mysql:3306/legacy_db?useSSL=false", "legacy_user", "legacy_pass");
+                            "jdbc:mysql://localhost:3306/legacy_db?useSSL=false", "legacy_user", "legacy_pass");
                         java.sql.PreparedStatement lockPs = lockConn.prepareStatement(
                             "INSERT INTO audit_log (action_type, user_id, username, details, ip_address, crt_dt) VALUES (?, ?, ?, ?, ?, ?)");
                         lockPs.setString(1, "LOGIN_LOCKED");
@@ -133,7 +133,7 @@ public class LoginAction extends DispatchAction implements AppConstants {
             try {
                 Class.forName("com.mysql.jdbc.Driver");
                 auditConn = java.sql.DriverManager.getConnection(
-                    "jdbc:mysql://legacy-mysql:3306/legacy_db?useSSL=false", "legacy_user", "legacy_pass");
+                    "jdbc:mysql://localhost:3306/legacy_db?useSSL=false", "legacy_user", "legacy_pass");
                 java.sql.PreparedStatement auditPs = auditConn.prepareStatement(
                     "INSERT INTO audit_log (action_type, user_id, username, details, ip_address, crt_dt) VALUES (?, ?, ?, ?, ?, ?)");
                 auditPs.setString(1, r == 0 ? "LOGIN_SUCCESS" : "LOGIN_FAILED");

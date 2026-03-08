@@ -26,7 +26,7 @@ public class CommonUtil implements AppConstants {
 
     private static int _n = 0;
 
-    private static final String DB_URL = "jdbc:mysql://legacy-mysql:3306/legacy_db?useSSL=false&autoReconnect=true";
+    private static final String DB_URL = "jdbc:mysql://localhost:3306/legacy_db?useSSL=false&autoReconnect=true";
     private static final String DB_USER = "legacy_user";
     private static final String DB_PASS = "legacy_pass";
 

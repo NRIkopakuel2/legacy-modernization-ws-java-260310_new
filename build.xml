@@ -15,6 +15,8 @@
 
     <property name="app.name" value="legacy-app"/>
     <property name="war.file" value="${app.name}.war"/>
+    <property name="java.source" value="1.8"/>
+    <property name="java.target" value="1.8"/>
 
     <!-- server paths -->
     <property name="tomcat.dir" value="/usr/local/tomcat"/>
@@ -93,8 +95,8 @@
                destdir="${classes.dir}"
                classpathref="compile.classpath"
                encoding="UTF-8"
-               source="1.8"
-               target="1.8"
+               source="${java.source}"
+               target="${java.target}"
                debug="true"
                deprecation="true"
                includeantruntime="false"/>
@@ -114,8 +116,8 @@
                destdir="${test.classes.dir}"
                classpathref="test.classpath"
                encoding="UTF-8"
-               source="1.8"
-               target="1.8"
+               source="${java.source}"
+               target="${java.target}"
                debug="true"
                deprecation="true"
                failonerror="false"/>
@@ -197,8 +199,8 @@
            destdir="${classes.dir}"
            classpathref="compile.classpath.extra"
            encoding="UTF-8"
-           source="1.8"
-           target="1.8"
+                     source="${java.source}"
+                     target="${java.target}"
            debug="true"
            deprecation="true"
            includeantruntime="false"/>
@@ -246,8 +248,8 @@
                destdir="${classes.dir}"
                classpathref="compile.classpath"
                encoding="UTF-8"
-               source="1.8"
-               target="1.8"
+               source="${java.source}"
+               target="${java.target}"
                debug="${staging.debug}"
                deprecation="false"
                includeantruntime="false"/>
@@ -296,8 +298,8 @@
 			   destdir="${classes.dir}"
 			   classpathref="compile.classpath.prod"
 			   encoding="UTF-8"
-			   source="1.8"
-			   target="1.8"
+               source="${java.source}"
+               target="${java.target}"
 			   debug="${prod.debug}"
 			   deprecation="false"
 			   includeantruntime="false"

@@ -411,7 +411,7 @@ public class BookstoreManager implements AppConstants {
                 try {
                     Class.forName("com.mysql.jdbc.Driver");
                     cartConn = java.sql.DriverManager.getConnection(
-                        "jdbc:mysql://legacy-mysql:3306/legacy_db?useSSL=false",
+                        "jdbc:mysql://localhost:3306/legacy_db?useSSL=false",
                         "legacy_user", "legacy_pass");
                     cartStmt = cartConn.createStatement();
                     // WARNING: SQL injection risk - sessionId not parameterized
@@ -2414,7 +2414,7 @@ public class BookstoreManager implements AppConstants {
         try {
             Class.forName("com.mysql.jdbc.Driver");
             conn = java.sql.DriverManager.getConnection(
-                "jdbc:mysql://legacy-mysql:3306/legacy_db?useSSL=false", "legacy_user", "legacy_pass");
+                "jdbc:mysql://localhost:3306/legacy_db?useSSL=false", "legacy_user", "legacy_pass");
             stmt = conn.createStatement();
             rs = stmt.executeQuery("SELECT * FROM books WHERE id = " + bookId);
             if (rs.next()) {
