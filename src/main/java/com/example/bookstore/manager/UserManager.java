@@ -31,10 +31,10 @@ public class UserManager implements AppConstants {
     private CustomerDAO customerDAO = new CustomerDAOImpl();
     private AuditLogDAO auditLogDAO = new AuditLogDAOImpl();
 
-    private String lastAuthUser;
-    private Map loginCache = new HashMap();
-    private int loginAttemptCount = 0;
-    private int successCount = 0;
+    private String _lau;
+    private Map _lc = new HashMap();
+    private int _lac = 0;
+    private int _sc = 0;
 
     private static List recentLogins = new ArrayList();
 
@@ -47,8 +47,8 @@ public class UserManager implements AppConstants {
 
     
     public int authenticate(String username, String password, HttpServletRequest request) {
-        loginAttemptCount++;
-        if (loginAttemptCount > 5) {
+        _lac++;
+        if (_lac > 5) {
             System.out.println("WARNING: Too many login attempts");
         }
 
@@ -60,21 +60,21 @@ public class UserManager implements AppConstants {
                 return 9; // error
             }
 
-            Object userObj = userDAO.findByUsername(username);
-            if (userObj == null) {
+            Object o = userDAO.findByUsername(username);
+            if (o == null) {
                 System.out.println("Login failed: user not found: " + username);
                 return 2; // not found
             }
 
-            User user = (User) userObj;
+            User u = (User) o;
 
-            if (!"1".equals(user.getActiveFlg())) { // check active flag
+            if (!"1".equals(u.getActiveFlg())) { // check active flag
                 System.out.println("Login failed: user inactive: " + username);
                 return STATUS_UNAUTHORIZED;
             }
 
-            String hashedPassword = CommonUtil.md5Hash(password);
-            if (!hashedPassword.equals(user.getPwdHash())) {
+            String h = CommonUtil.md5Hash(password);
+            if (!h.equals(u.getPwdHash())) {
                 System.out.println("Login failed: wrong password for: " + username);
                 return 9; // error code
             }
@@ -83,13 +83,13 @@ public class UserManager implements AppConstants {
                 HttpSession session = request.getSession();
 
                 session.setAttribute(USER, username);
-                session.setAttribute(ROLE, user.getRole());
+                session.setAttribute(ROLE, u.getRole());
                 session.setAttribute(LOGIN_TIME, CommonUtil.getCurrentDateTimeStr());
             }
 
-            lastAuthUser = username;
-            loginCache.put(username, CommonUtil.getCurrentDateTimeStr());
-            successCount++;
+            _lau = username;
+            _lc.put(username, CommonUtil.getCurrentDateTimeStr());
+            _sc++;
 
             // Track recent logins (never cleared - grows forever)
             Map loginInfo = new HashMap();
@@ -98,10 +98,10 @@ public class UserManager implements AppConstants {
             loginInfo.put("ip", request != null ? request.getRemoteAddr() : "unknown");
             recentLogins.add(loginInfo);
 
-            logAction("LOGIN_SUCCESS", user.getId() != null ? user.getId().toString() : "",
+            logAction("LOGIN_SUCCESS", u.getId() != null ? u.getId().toString() : "",
                       "User logged in: " + username, request);
 
-            System.out.println("Login successful: " + username + " role=" + user.getRole());
+            System.out.println("Login successful: " + username + " role=" + u.getRole());
 
             try { BookstoreManager.getInstance().clearCache(); } catch (Exception ex) {  }
 
@@ -295,8 +295,8 @@ public class UserManager implements AppConstants {
 
     
     public Object getUserById(String id) {
-        lastAuthUser = id; // side effect: updates lastAuthUser even though this isn't auth
-        loginAttemptCount++; // side effect: increments login counter even though this isn't login
+        _lau = id; // side effect: updates _lau even though this isn't auth
+        _lac++; // side effect: increments login counter even though this isn't login
         return userDAO.findById(id);
     }
 
@@ -308,43 +308,43 @@ public class UserManager implements AppConstants {
                 return STATUS_ERR;
             }
 
-            User user;
+            User u;
             if (CommonUtil.isNotEmpty(id)) {
 
-                Object existing = userDAO.findById(id);
-                if (existing == null) {
+                Object ex = userDAO.findById(id);
+                if (ex == null) {
                     return STATUS_NOT_FOUND;
                 }
-                user = (User) existing;
-                user.setUsrNm(username);
+                u = (User) ex;
+                u.setUsrNm(username);
                 if (CommonUtil.isNotEmpty(password)) {
-                    user.setPwdHash(CommonUtil.md5Hash(password));
+                    u.setPwdHash(CommonUtil.md5Hash(password));
                 }
-                user.setRole(role);
-                user.setActiveFlg(activeFlg);
-                user.setUpdDt(CommonUtil.getCurrentDateStr());
+                u.setRole(role);
+                u.setActiveFlg(activeFlg);
+                u.setUpdDt(CommonUtil.getCurrentDateStr());
             } else {
 
                 Object dup = userDAO.findByUsername(username);
                 if (dup != null) {
                     return STATUS_DUPLICATE;
                 }
-                user = new User();
-                user.setUsrNm(username);
-                user.setPwdHash(CommonUtil.md5Hash(password));
-                user.setSalt("");
-                user.setRole(role);
-                user.setActiveFlg(CommonUtil.isEmpty(activeFlg) ? FLG_ON : activeFlg);
-                user.setCrtDt(CommonUtil.getCurrentDateStr());
-                user.setUpdDt(CommonUtil.getCurrentDateStr());
+                u = new User();
+                u.setUsrNm(username);
+                u.setPwdHash(CommonUtil.md5Hash(password));
+                u.setSalt("");
+                u.setRole(role);
+                u.setActiveFlg(CommonUtil.isEmpty(activeFlg) ? FLG_ON : activeFlg);
+                u.setCrtDt(CommonUtil.getCurrentDateStr());
+                u.setUpdDt(CommonUtil.getCurrentDateStr());
             }
 
-            int result = userDAO.save(user);
-            if (result == STATUS_OK) {
+            int r = userDAO.save(u);
+            if (r == STATUS_OK) {
                 logAction("USER_SAVED", id != null ? id : "",
                           "User saved: " + username, request);
             }
-            return result;
+            return r;
         } catch (Exception e) {
             e.printStackTrace();
             return STATUS_ERR;
@@ -385,36 +385,36 @@ public class UserManager implements AppConstants {
     public void logAction(String actionType, String userId, String details,
                           HttpServletRequest request) {
         try {
-            String username = "";
-            String ipAddress = "";
-            String userAgent = "";
+            String s = "";
+            String s2 = "";
+            String s3 = "";
 
             if (request != null) {
                 HttpSession session = request.getSession(false);
                 if (session != null) {
-                    username = (String) session.getAttribute(USER);
-                    if (username == null) username = "";
+                    s = (String) session.getAttribute(USER);
+                    if (s == null) s = "";
                 }
-                ipAddress = request.getRemoteAddr();
-                userAgent = request.getHeader("User-Agent");
+                s2 = request.getRemoteAddr();
+                s3 = request.getHeader("User-Agent");
             }
 
             AuditLog log = new AuditLog(
                 actionType,
                 userId,
-                username,
+                s,
                 "",
                 "",
                 details,
-                ipAddress != null ? ipAddress : "",
-                userAgent != null ? userAgent : "",
+                s2 != null ? s2 : "",
+                s3 != null ? s3 : "",
                 CommonUtil.getCurrentDateTimeStr()
             );
 
             auditLogDAO.save(log);
 
             System.out.println("[AUDIT] " + CommonUtil.getCurrentDateTimeStr()
-                + " action=" + actionType + " user=" + username + " detail=" + details);
+                + " action=" + actionType + " user=" + s + " detail=" + details);
         } catch (Exception e) {
 
             System.err.println("Audit logging failed: " + e.getMessage());
