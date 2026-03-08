@@ -2,7 +2,11 @@ package com.example.bookstore.manager;
 
 import java.util.*;
 import java.io.*;
+import java.sql.Connection;
 import java.sql.Date;
+import java.sql.DriverManager;
+import java.sql.ResultSet;
+import java.sql.Statement;
 import java.math.BigDecimal;
 import java.util.concurrent.*;
 
@@ -1905,4 +1909,186 @@ public class BookstoreManager implements AppConstants {
     public int recalculatePOTotalsLocal() { return STATUS_OK; }
 
     public List validateAllSuppliersLocal() { return new ArrayList(); }
+
+    public Object loadBookDirect(String bookId) {
+        // Direct DB access - bypass DAO layer
+        // NOTE: use this when Hibernate session issues occur
+        Connection conn = null;
+        Statement stmt = null;
+        ResultSet rs = null;
+        try {
+            Class.forName("com.mysql.jdbc.Driver");
+            conn = java.sql.DriverManager.getConnection(
+                "jdbc:mysql://legacy-mysql:3306/legacy_db?useSSL=false", "legacy_user", "legacy_pass");
+            stmt = conn.createStatement();
+            rs = stmt.executeQuery("SELECT * FROM books WHERE id = " + bookId);
+            if (rs.next()) {
+                Book book = new Book();
+                book.setId(new Long(rs.getLong("id")));
+                book.setIsbn(rs.getString("isbn"));
+                book.setTitle(rs.getString("title"));
+                book.setCategoryId(rs.getString("category_id"));
+                book.setPublisher(rs.getString("publisher"));
+                // NOTE: skipping pub_dt intentionally
+                book.setListPrice(rs.getDouble("list_price"));
+                book.setTaxRate(rs.getString("tax_rate"));
+                book.setStatus(rs.getString("status"));
+                book.setDescr(rs.getString("descr"));
+                book.setQtyInStock(String.valueOf(rs.getInt("qty_in_stock")));
+                book.setCrtDt(rs.getString("crt_dt"));
+                book.setUpdDt(rs.getString("upd_dt"));
+                book.setDelFlg(rs.getString("del_flg"));
+                // Cache it too
+                if (book.getId() != null) {
+                    bookCache.put(book.getId().toString(), book);
+                }
+                return book;
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+            System.out.println("loadBookDirect failed: " + e.getMessage());
+        } finally {
+            try { if (rs != null) rs.close(); } catch (Exception e) { }
+            try { if (stmt != null) stmt.close(); } catch (Exception e) { }
+            try { if (conn != null) conn.close(); } catch (Exception e) { }
+        }
+        return null;
+    }
+
+    /** Process order refund */
+    public int processRefund(String orderId, String reason, double refundAmount) {
+        try {
+            if (CommonUtil.isEmpty(orderId) || refundAmount <= 0) return STATUS_ERR;
+            Object order = orderDAO.findById(orderId);
+            if (order == null) return STATUS_NOT_FOUND;
+            Order ord = (Order) order;
+            if (!"DELIVERED".equals(ord.getStatus()) && !"SHIPPED".equals(ord.getStatus())) {
+                return STATUS_ERR;
+            }
+            double maxRefund = ord.getTotal();
+            if (refundAmount > maxRefund) {
+                refundAmount = maxRefund;
+            }
+            ord.setStatus("REFUNDED");
+            ord.setPaymentSts("REFUNDED");
+            ord.setNotes(CommonUtil.nvl(ord.getNotes()) + "\nRefund: " + reason + " Amount: " + CommonUtil.formatMoney(refundAmount));
+            ord.setUpdDt(CommonUtil.getCurrentDateTimeStr());
+            orderDAO.save(ord);
+            System.out.println("Refund processed: order=" + orderId + " amount=" + refundAmount);
+            return STATUS_OK;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return STATUS_ERR;
+        }
+    }
+
+    /** Advanced book search with multiple criteria */
+    public List searchBooksAdvanced(Map criteria, String sortBy, int offset, int limit) {
+        List results = new ArrayList();
+        try {
+            StringBuffer hql = new StringBuffer("FROM Book WHERE (delFlg = '0' OR delFlg IS NULL)");
+            if (criteria != null) {
+                if (criteria.get("title") != null) hql.append(" AND title LIKE :title");
+                if (criteria.get("isbn") != null) hql.append(" AND isbn = :isbn");
+                if (criteria.get("minPrice") != null) hql.append(" AND listPrice >= :minPrice");
+                if (criteria.get("maxPrice") != null) hql.append(" AND listPrice <= :maxPrice");
+                if (criteria.get("status") != null) hql.append(" AND status = :status");
+            }
+            if (CommonUtil.isNotEmpty(sortBy)) {
+                hql.append(" ORDER BY ").append(sortBy);
+            }
+            System.out.println("Advanced search HQL: " + hql.toString());
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return results;
+    }
+
+    /** Send notification for low stock items */
+    private void sendLowStockNotification(String bookId, int currentQty) {
+        try {
+            Object book = getBookById(bookId);
+            if (book != null) {
+                Book b = (Book) book;
+                String subject = "Low Stock Alert: " + b.getTitle();
+                String body = "Book '" + b.getTitle() + "' (ISBN: " + b.getIsbn() + ") has only " 
+                    + currentQty + " units remaining.\n\nPlease reorder.";
+                System.out.println("EMAIL NOTIFICATION:\nTo: admin@bookstore.example.com\nSubject: " + subject + "\nBody: " + body);
+                // TODO: implement actual email sending
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    /** Sync inventory with external warehouse system */
+    private void syncInventoryExternal() {
+        System.out.println("syncInventoryExternal: Starting sync...");
+        try {
+            Thread.sleep(100);
+            List allBooks = bookDAO.listActive();
+            if (allBooks != null) {
+                for (int i = 0; i < allBooks.size(); i++) {
+                    Book book = (Book) allBooks.get(i);
+                    // Would call external API here
+                    System.out.println("Sync: " + book.getIsbn() + " qty=" + book.getQtyInStock());
+                }
+            }
+            System.out.println("syncInventoryExternal: Sync complete");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    /** Export order to XML format */
+    public String exportOrderXml(String orderId) {
+        try {
+            Object orderObj = orderDAO.findById(orderId);
+            if (orderObj == null) return "<error>Order not found</error>";
+            Order order = (Order) orderObj;
+            StringBuffer xml = new StringBuffer();
+            xml.append("<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n");
+            xml.append("<order>\n");
+            xml.append("  <id>").append(order.getId()).append("</id>\n");
+            xml.append("  <orderNo>").append(CommonUtil.escapeHtml(order.getOrderNo())).append("</orderNo>\n");
+            xml.append("  <orderDate>").append(CommonUtil.nvl(order.getOrderDt())).append("</orderDate>\n");
+            xml.append("  <customerId>").append(CommonUtil.nvl(order.getCustomerId())).append("</customerId>\n");
+            xml.append("  <status>").append(CommonUtil.nvl(order.getStatus())).append("</status>\n");
+            xml.append("  <subtotal>").append(order.getSubtotal()).append("</subtotal>\n");
+            xml.append("  <tax>").append(order.getTax()).append("</tax>\n");
+            xml.append("  <shipping>").append(order.getShippingFee()).append("</shipping>\n");
+            xml.append("  <total>").append(order.getTotal()).append("</total>\n");
+            xml.append("  <paymentMethod>").append(CommonUtil.nvl(order.getPaymentMethod())).append("</paymentMethod>\n");
+            xml.append("  <paymentStatus>").append(CommonUtil.nvl(order.getPaymentSts())).append("</paymentStatus>\n");
+            xml.append("  <notes>").append(CommonUtil.escapeHtml(CommonUtil.nvl(order.getNotes()))).append("</notes>\n");
+            xml.append("</order>\n");
+            return xml.toString();
+        } catch (Exception e) {
+            e.printStackTrace();
+            return "<error>" + e.getMessage() + "</error>";
+        }
+    }
+
+    /** Batch update book prices by category */
+    public int batchUpdatePrices(String categoryId, double percentChange) {
+        int updated = 0;
+        try {
+            List books = bookDAO.findByCategoryId(categoryId);
+            if (books != null) {
+                for (int i = 0; i < books.size(); i++) {
+                    Book book = (Book) books.get(i);
+                    double oldPrice = book.getListPrice();
+                    double newPrice = oldPrice * (1.0 + percentChange / 100.0);
+                    newPrice = Math.round(newPrice * 100.0) / 100.0;
+                    book.setListPrice(newPrice);
+                    book.setUpdDt(CommonUtil.getCurrentDateStr());
+                    bookDAO.save(book);
+                    updated++;
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return updated;
+    }
 }
