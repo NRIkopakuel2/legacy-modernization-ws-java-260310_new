@@ -5,8 +5,9 @@
 # Measures 15 dimensions of anti-patterns in Java/JSP codebases and produces
 # a quality score out of 100. Higher score = better quality.
 #
-# Usage: ./assess-quality.sh [source-directory]
+# Usage: ./assess-quality.sh [--verbose|-v] [source-directory]
 #   source-directory: Root of Java source tree (default: src/)
+#   --verbose|-v:     Show detailed matches for each dimension
 #
 # Dependencies: grep, wc, find, awk, sort (standard Unix tools)
 # ==============================================================================
@@ -15,10 +16,18 @@ set -uo pipefail
 # Note: -e (exit on error) intentionally omitted — grep returns 1 when no matches found
 
 # --- Configuration ---
-SRC_DIR="${1:-src}"
+SRC_DIR="src"
+VERBOSE=false
+for arg in "$@"; do
+    case "$arg" in
+        --verbose|-v) VERBOSE=true ;;
+        *) if [ -d "$arg" ]; then SRC_DIR="$arg"; fi ;;
+    esac
+done
+
 if [ ! -d "$SRC_DIR" ]; then
     echo "ERROR: Source directory '$SRC_DIR' not found."
-    echo "Usage: $0 [source-directory]"
+    echo "Usage: $0 [--verbose|-v] [source-directory]"
     exit 1
 fi
 
@@ -109,7 +118,7 @@ echo ""
 # DIMENSION 1: Security Vulnerabilities (15 pts)
 # ==============================================================================
 SEC_SQL_INJECTION=$(grep -rn '"SELECT\|"INSERT\|"UPDATE\|"DELETE' "$SRC_DIR" 2>/dev/null | grep -c ' + \|" +\|+ "' || echo 0)
-SEC_HARDCODED_CREDS=$(grep -r "legacy_pass\|legacy_user\|password.*=.*\"[a-zA-Z]" "$SRC_DIR" 2>/dev/null | grep -v "\.class$" | wc -l)
+SEC_HARDCODED_CREDS=$(grep -rn "password\|passwd\|pwd\|secret\|api[_-]\?key\|apikey\|token\|credential" "$SRC_DIR" 2>/dev/null | grep "\.java\|\.jsp\|\.xml\|\.properties" | grep -i "=.*\"[a-zA-Z0-9]" | grep -v "getParameter\|getAttribute\|request\.\|//.*password\|/\*.*password\|\*.*password" | wc -l)
 SEC_JDBC_IN_VIEWS=$(grep -rl "DriverManager\|getConnection" "$SRC_DIR" 2>/dev/null | grep -c "\.jsp$" || echo 0)
 SEC_JDBC_IN_MODELS=$(grep -rl "DriverManager\|java\.sql\.\*" "$SRC_DIR" 2>/dev/null | grep -c "/model/\|/form/\|/action/" || echo 0)
 
@@ -117,6 +126,14 @@ SEC_RAW=$((SEC_SQL_INJECTION + SEC_HARDCODED_CREDS + SEC_JDBC_IN_VIEWS * 5 + SEC
 SEC_NORM=$(awk -v r="$SEC_RAW" -v k="$KLOC" 'BEGIN { printf "%.1f", r / k }')
 SEC_DEDUCT=$(awk -v n="$SEC_NORM" 'BEGIN { d = n * 0.3; if (d > 15) d = 15; printf "%.1f", d }')
 D1_SCORE=$(deduct 15 "$SEC_DEDUCT")
+
+if [ "$VERBOSE" = true ]; then
+    echo "  [D1 detail] SQL injection matches:"
+    grep -rn '"SELECT\|"INSERT\|"UPDATE\|"DELETE' "$SRC_DIR" 2>/dev/null | grep ' + \|" +\|+ "' | head -5
+    echo "  [D1 detail] Credential matches:"
+    grep -rn "password\|passwd\|pwd\|secret\|api[_-]\?key" "$SRC_DIR" 2>/dev/null | grep "\.java\|\.jsp" | grep -i "=.*\"[a-zA-Z0-9]" | grep -v "getParameter\|getAttribute\|request\.\|//.*password" | head -5
+    echo ""
+fi
 
 # ==============================================================================
 # DIMENSION 2: Error Handling (12 pts)
@@ -132,6 +149,12 @@ EH_NORM=$(awk -v r="$EH_RAW" -v k="$KLOC" 'BEGIN { printf "%.1f", r / k }')
 EH_DEDUCT=$(awk -v n="$EH_NORM" 'BEGIN { d = n * 0.2; if (d > 12) d = 12; printf "%.1f", d }')
 D2_SCORE=$(deduct 12 "$EH_DEDUCT")
 
+if [ "$VERBOSE" = true ]; then
+    echo "  [D2 detail] Empty catch blocks:"
+    grep -rPn "catch\s*\([^)]+\)\s*\{\s*\}" "$SRC_DIR" 2>/dev/null | head -5
+    echo ""
+fi
+
 # ==============================================================================
 # DIMENSION 3: God Classes (10 pts)
 # ==============================================================================
@@ -144,6 +167,12 @@ GC_CONCENTRATION=$(awk -v m="$GC_MAX_LOC" -v t="$JAVA_LOC" 'BEGIN { if (t > 0) p
 GC_DEDUCT=$(awk -v o5="$GC_OVER_500" -v o1="$GC_OVER_1000" -v c="$GC_CONCENTRATION" \
     'BEGIN { d = o5 * 0.5 + o1 * 1.5 + c * 0.2; if (d > 10) d = 10; printf "%.1f", d }')
 D3_SCORE=$(deduct 10 "$GC_DEDUCT")
+
+if [ "$VERBOSE" = true ]; then
+    echo "  [D3 detail] Files over 500 LOC:"
+    find "$SRC_DIR" -name "*.java" -exec wc -l {} + 2>/dev/null | grep -v "total$" | awk '$1 > 500 {print "    " $1 " " $2}' | sort -rn | head -5
+    echo ""
+fi
 
 # ==============================================================================
 # DIMENSION 4: Memory & Resource Leaks (6 pts)
@@ -162,7 +191,7 @@ D4_SCORE=$(deduct 6 "$ML_DEDUCT")
 # ==============================================================================
 # DIMENSION 5: Copy-Paste / Duplication (8 pts)
 # ==============================================================================
-CP_JDBC_URLS=$(count_pattern "jdbc:mysql://\|jdbc:oracle://\|jdbc:postgresql://" "$SRC_DIR")
+CP_JDBC_URLS=$(count_pattern "jdbc:" "$SRC_DIR")
 CP_GETCONNECTION=$(count_pattern "getConnection\|DriverManager" "$SRC_DIR")
 CP_SYSOUT=$(count_pattern "System\.out\.println\|System\.out\.print(" "$SRC_DIR")
 CP_SYSERR=$(count_pattern "System\.err" "$SRC_DIR")
@@ -171,6 +200,12 @@ CP_RAW=$((CP_JDBC_URLS * 2 + CP_GETCONNECTION + CP_SYSOUT + CP_SYSERR))
 CP_NORM=$(awk -v r="$CP_RAW" -v k="$KLOC" 'BEGIN { printf "%.1f", r / k }')
 CP_DEDUCT=$(awk -v n="$CP_NORM" 'BEGIN { d = n * 0.15; if (d > 8) d = 8; printf "%.1f", d }')
 D5_SCORE=$(deduct 8 "$CP_DEDUCT")
+
+if [ "$VERBOSE" = true ]; then
+    echo "  [D5 detail] Top System.out.println files by count:"
+    grep -rc "System\.out\.println\|System\.out\.print(" "$SRC_DIR" 2>/dev/null | grep "\.java:" | awk -F: '$NF > 0' | sort -t: -k2 -rn | head -5 | awk -F: '{print "    " $NF " " $1}'
+    echo ""
+fi
 
 # ==============================================================================
 # DIMENSION 6: Global Mutable State (7 pts)
@@ -240,6 +275,16 @@ LOG_DEDUCT=$(awk -v f="$LOG_FRAMEWORKS" -v s="$LOG_SYSOUT_FILES" -v k="$KLOC" \
     'BEGIN { d = 0; if (f > 1) d = (f - 1) * 1.5; d = d + (s / k) * 0.3; if (d > 5) d = 5; printf "%.1f", d }')
 D10_SCORE=$(deduct 5 "$LOG_DEDUCT")
 
+if [ "$VERBOSE" = true ]; then
+    echo "  [D10 detail] Logging frameworks detected:"
+    [ "$LOG_SYSOUT_FILES" -gt 0 ] && echo "    System.out.println: $LOG_SYSOUT_FILES files"
+    [ "$LOG_JUL_FILES" -gt 0 ] && echo "    java.util.logging: $LOG_JUL_FILES files"
+    [ "$LOG_COMMONS_FILES" -gt 0 ] && echo "    commons-logging: $LOG_COMMONS_FILES files"
+    [ "$LOG_LOG4J_FILES" -gt 0 ] && echo "    log4j: $LOG_LOG4J_FILES files"
+    [ "$LOG_SLF4J_FILES" -gt 0 ] && echo "    SLF4J: $LOG_SLF4J_FILES files"
+    echo ""
+fi
+
 # ==============================================================================
 # DIMENSION 11: Configuration Quality (5 pts)
 # ==============================================================================
@@ -256,7 +301,9 @@ D11_SCORE=$(deduct 5 "$CFG_DEDUCT")
 # ==============================================================================
 DC_TODO=$(count_pattern "// TODO\|// FIXME\|// HACK\|// XXX\|// BUG" "$SRC_DIR")
 DC_COMMENTED_CODE=$(grep -rn "^[[:space:]]*//.*return\|^[[:space:]]*//.*if (\|^[[:space:]]*//.*for (" "$SRC_DIR" 2>/dev/null | grep "\.java:" | wc -l)
-DC_FEATURE_FLAGS=$(count_pattern "LEGACY_MODE\|USE_NEW_\|ENABLE_.*=.*false\|FEATURE_.*=\|_V2\b" "$SRC_DIR")
+DC_FEATURE_FLAGS=$(grep -rn "boolean.*=.*false" "$SRC_DIR" 2>/dev/null | grep "\.java:" | grep -i "todo\|fixme\|disabled\|deprecated\|never\|not yet\|rolled back\|remove" | wc -l)
+DC_FEATURE_FLAGS_V2=$(grep -rn "_V2\b\|_OLD\b\|_DEPRECATED\b\|_DISABLED\b\|_LEGACY\b" "$SRC_DIR" 2>/dev/null | grep "\.java:" | wc -l)
+DC_FEATURE_FLAGS=$((DC_FEATURE_FLAGS + DC_FEATURE_FLAGS_V2))
 
 DC_RAW=$((DC_TODO + DC_COMMENTED_CODE + DC_FEATURE_FLAGS * 2))
 DC_NORM=$(awk -v r="$DC_RAW" -v k="$KLOC" 'BEGIN { printf "%.1f", r / k }')

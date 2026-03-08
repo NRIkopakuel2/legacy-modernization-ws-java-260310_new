@@ -1,228 +1,165 @@
-# Scoring Rubric — Code Quality Anti-Pattern Assessment
+# Scoring Rubric — Mathematical Methodology
 
 ## Overview
-This document describes the detailed scoring methodology for each of the 15 dimensions.
-All metrics are normalized per 1,000 lines of code (KLOC) to enable fair comparison across
-codebases of different sizes.
+This document describes the mathematical formulas and normalization methodology used
+by the assessment script. For the definitive assessment criteria (what each dimension
+measures, with examples), see [SKILL.md](../SKILL.md).
 
 ## General Formula
+
 Each dimension starts at its maximum points and deducts based on anti-pattern density:
 
 ```
 dimension_score = max(0, max_points - deduction)
-deduction = normalized_metric * deduction_rate
-normalized_metric = raw_count / KLOC
+deduction = normalized_weighted_count × deduction_rate
+normalized_weighted_count = weighted_raw_count / KLOC
+KLOC = max(1.0, total_LOC / 1000)
+total_LOC = Java_LOC + JSP_LOC
 ```
 
----
-
-## Dimension 1: Security Vulnerabilities (15 points)
-
-**Why it matters:** Security flaws are the highest-impact code quality issue. A single SQL
-injection can compromise an entire database.
-
-### Metrics
-| Metric | How Measured | Weight |
-|--------|-------------|--------|
-| SQL injection vectors | String concatenation in SQL queries (`"SELECT..." +`) | ×1 |
-| Hardcoded credentials | Patterns like `password=`, `legacy_pass` in source | ×1 |
-| JDBC in view layer | JSP files containing `DriverManager`/`getConnection` | ×5 |
-| JDBC in wrong layer | Model/form/action files with `java.sql.*` | ×3 |
-
-**Deduction rate:** 0.3 per normalized point
-
-### Score Interpretation
-| Score | Meaning |
-|-------|---------|
-| 13-15 | No or minimal security issues |
-| 9-12 | Some hardcoded values, minor exposure |
-| 5-8 | SQL injection present, credentials in source |
-| 0-4 | Critical: widespread injection, credentials everywhere |
+Normalization per 1,000 LOC (KLOC) enables fair comparison across codebases of
+different sizes. A 5K-LOC project and a 50K-LOC project are scored on the same scale.
 
 ---
 
-## Dimension 2: Error Handling (12 points)
+## Dimension Formulas
 
-**Why it matters:** Poor error handling leads to silent failures, data corruption, and
-impossible debugging in production.
+### D1: Security Vulnerabilities (max 15)
+```
+raw = SQL_injection_count + hardcoded_creds + (JDBC_in_views × 5) + (JDBC_in_wrong_layer × 3)
+normalized = raw / KLOC
+deduction = normalized × 0.3 (capped at 15)
+```
 
-### Metrics
-| Metric | How Measured | Weight |
-|--------|-------------|--------|
-| Generic `catch(Exception)` | Grep for catch(Exception | ×1 |
-| `catch(Throwable)` | Catches everything including Error | ×3 |
-| `catch(NullPointerException)` | Masking null bugs | ×3 |
-| Empty catch blocks | `catch(...) { }` with no handling | ×2 |
-| `printStackTrace()` | Not using a logging framework | ×1 |
+### D2: Error Handling (max 12)
+```
+raw = catch_Exception + (catch_Throwable × 3) + (catch_NPE × 3) + (empty_catch × 2) + printStackTrace
+normalized = raw / KLOC
+deduction = normalized × 0.2 (capped at 12)
+```
 
-**Deduction rate:** 0.2 per normalized point
+### D3: God Classes (max 10)
+```
+deduction = (files_over_500 × 0.5) + (files_over_1000 × 1.5) + (concentration_pct × 0.2)
+concentration_pct = (largest_file_LOC / total_Java_LOC) × 100
+```
+*Not normalized by KLOC — absolute file counts matter.*
 
----
+### D4: Memory & Resource Leaks (max 6)
+```
+raw = mutable_static_collections + (files_without_finally × 2)
+normalized = raw / KLOC
+deduction = normalized × 1.0 (capped at 6)
+```
 
-## Dimension 3: God Classes (10 points)
+### D5: Copy-Paste / Duplication (max 8)
+```
+raw = (JDBC_URLs × 2) + getConnection_count + System_out_count + System_err_count
+normalized = raw / KLOC
+deduction = normalized × 0.15 (capped at 8)
+```
 
-**Why it matters:** God classes are the #1 indicator of architectural decay. They resist
-refactoring, testing, and team collaboration.
+### D6: Global Mutable State (max 7)
+```
+raw = mutable_static_fields + (thread_unsafe_DateFormat × 5)
+normalized = raw / KLOC
+deduction = normalized × 0.5 (capped at 7)
+```
 
-### Metrics
-| Metric | How Measured | Weight |
-|--------|-------------|--------|
-| Files > 500 LOC | `wc -l` per Java file | ×0.5 per file |
-| Files > 1000 LOC | Additional penalty for extreme size | ×1.5 per file |
-| Code concentration | Largest file LOC / total LOC | ×0.2 per % |
+### D7: Naming & Readability (max 5)
+```
+raw = wildcard_imports + (single_char_vars × 2) + (mixed_getters × 2)
+normalized = raw / KLOC
+deduction = normalized × 0.3 (capped at 5)
+```
 
----
+### D8: Concurrency Safety (max 5)
+```
+raw = (Thread_sleep × 3) + String_identity_comparisons + (broken_DCL × 5)
+normalized = raw / KLOC
+deduction = normalized × 0.8 (capped at 5)
+```
 
-## Dimension 4: Memory & Resource Leaks (6 points)
+### D9: Magic Numbers & Strings (max 5)
+```
+raw = hardcoded_status_strings + (numeric_return_codes × 2)
+normalized = raw / KLOC
+deduction = normalized × 0.5 (capped at 5)
+```
 
-**Why it matters:** Memory leaks cause OutOfMemoryError in production. Resource leaks
-exhaust connection pools and file handles.
+### D10: Logging Consistency (max 5)
+```
+framework_penalty = max(0, (distinct_frameworks - 1)) × 1.5
+spread_penalty = (sysout_file_count / KLOC) × 0.3
+deduction = framework_penalty + spread_penalty (capped at 5)
+```
 
-### Metrics
-| Metric | How Measured | Weight |
-|--------|-------------|--------|
-| Static collections | `static List/Map/Set/ArrayList/HashMap` (mutable) | ×1 |
-| Missing finally blocks | Files with getConnection/openSession but no finally | ×2 |
+### D11: Configuration Quality (max 5)
+```
+raw = commented_XML_blocks + config_param_count
+normalized = raw / KLOC
+deduction = normalized × 0.3 (capped at 5)
+```
 
----
+### D12: Dead Code (max 5)
+```
+raw = TODO_FIXME_count + commented_code_lines + (feature_flags × 2)
+normalized = raw / KLOC
+deduction = normalized × 0.3 (capped at 5)
+```
 
-## Dimension 5: Copy-Paste / Duplication (8 points)
+### D13: Method Complexity (max 5)
+```
+avg_method_size = Java_LOC / method_count
+size_penalty = max(0, (avg_method_size - 30)) × 0.1
+nesting_penalty = (deep_nesting_lines / KLOC) × 0.1
+deduction = size_penalty + nesting_penalty (capped at 5)
+```
 
-**Why it matters:** Duplicated code means bugs must be fixed in multiple places. Missed
-copies become divergent behavior.
+### D14: Dependency Structure (max 4)
+```
+deduction = (circular_dep_pairs × 2) + (tight_coupling_count / KLOC × 0.5)
+(capped at 4)
+```
 
-### Metrics
-| Metric | How Measured | Weight |
-|--------|-------------|--------|
-| JDBC URL copies | `jdbc:mysql://` pattern count | ×2 |
-| getConnection calls | Spread of raw connection acquisition | ×1 |
-| System.out.println | Console output instead of logging | ×1 |
-| System.err usage | Error console output | ×1 |
-
----
-
-## Dimension 6: Global Mutable State (7 points)
-
-**Why it matters:** Mutable static state creates hidden coupling between requests,
-race conditions, and unpredictable behavior.
-
-### Metrics
-| Metric | How Measured | Weight |
-|--------|-------------|--------|
-| Mutable static fields | `static` (non-final) field declarations | ×1 |
-| Thread-unsafe DateFormat | Static SimpleDateFormat without ThreadLocal | ×5 |
-
----
-
-## Dimension 7: Naming & Readability (5 points)
-
-### Metrics
-| Metric | How Measured | Weight |
-|--------|-------------|--------|
-| Wildcard imports | `import.*\.\*;` | ×1 |
-| Single-char variables | `private .* [a-z];` | ×2 |
-| Mixed getter naming | `get[a-z][a-z]` (lowercase after get) | ×2 |
-
----
-
-## Dimension 8: Concurrency Safety (5 points)
-
-### Metrics
-| Metric | How Measured | Weight |
-|--------|-------------|--------|
-| Thread.sleep in handlers | `Thread.sleep` in source | ×3 |
-| String == comparison | `== "` in Java files | ×1 |
-| Broken DCL patterns | synchronized + null check without volatile | ×5 |
-
----
-
-## Dimension 9: Magic Numbers & Strings (5 points)
-
-### Metrics
-| Metric | How Measured | Weight |
-|--------|-------------|--------|
-| Hardcoded status strings | "ACTIVE", "PENDING", "DRAFT", etc. | ×1 |
-| Numeric return codes | `return N;` where N > 1 or N < 0 | ×2 |
-
----
-
-## Dimension 10: Logging Consistency (5 points)
-
-### Metrics
-| Metric | How Measured | Weight |
-|--------|-------------|--------|
-| Number of logging frameworks | Count of distinct frameworks used | ×1.5 per extra |
-| System.out file count | Files using System.out.println | ×0.3/KLOC |
-
-**Framework detection:** System.out, java.util.logging, commons-logging, log4j, slf4j
+### D15: JSP / View Layer (max 3)
+```
+deduction = (scriptlet_count / KLOC × 0.1) + (JDBC_in_JSP_count × 0.5) + (reflection_in_JSP × 0.3)
+(capped at 3)
+```
+*If no JSP files exist, score = 3/3 (full points).*
 
 ---
 
-## Dimension 11: Configuration Quality (5 points)
+## Final Score
 
-### Metrics
-| Metric | How Measured | Weight |
-|--------|-------------|--------|
-| Commented-out XML | `<!--` count in XML files | ×1 |
-| Config param density | context-param, init-param, filter-mapping count | ×1 |
+```
+total = D1 + D2 + D3 + D4 + D5 + D6 + D7 + D8 + D9 + D10 + D11 + D12 + D13 + D14 + D15
+```
 
----
-
-## Dimension 12: Dead Code (5 points)
-
-### Metrics
-| Metric | How Measured | Weight |
-|--------|-------------|--------|
-| TODO/FIXME/HACK comments | Pattern count in source | ×1 |
-| Commented-out code | Lines starting with `//` followed by code keywords | ×1 |
-| Feature flags | LEGACY_MODE, USE_NEW_, ENABLE_...=false patterns | ×2 |
+| Total Score | Grade | Interpretation |
+|-------------|-------|----------------|
+| 90-100 | A (Excellent) | Clean, well-structured, production-ready |
+| 80-89 | B (Good) | Minor issues, maintainable with small effort |
+| 70-79 | C (Acceptable) | Notable tech debt, needs planned refactoring |
+| 50-69 | D (Poor) | Significant anti-patterns, hard to maintain |
+| 30-49 | E (Very Poor) | Critical issues, high risk of bugs/outages |
+| 0-29 | F (Unmaintainable) | Rewrite recommended, active liability |
 
 ---
 
-## Dimension 13: Method Complexity (5 points)
+## Tracking Progress
 
-### Metrics
-| Metric | How Measured | Weight |
-|--------|-------------|--------|
-| Average method size | LOC / method_count | Based on ratio |
-| Deep nesting | Lines with 24+ spaces of indentation | ×0.1/KLOC |
+Run the assessment at regular intervals and record the score:
 
----
+```
+Date        Score  Grade  Notes
+2024-01-15  42.3   E      Baseline before refactoring
+2024-02-15  58.7   D      After security fixes
+2024-03-15  71.2   C      After god class decomposition
+2024-04-15  83.1   B      After error handling overhaul
+```
 
-## Dimension 14: Dependency Structure (4 points)
-
-### Metrics
-| Metric | How Measured | Weight |
-|--------|-------------|--------|
-| Circular dependencies | Manager/service files that import each other | ×2 |
-| Tight coupling | Non-factory files using `new SomethingImpl()` | ×0.5/KLOC |
-
----
-
-## Dimension 15: JSP / View Layer (3 points)
-
-### Metrics
-| Metric | How Measured | Weight |
-|--------|-------------|--------|
-| Scriptlet blocks | `<%` (non-directive) in JSP files | ×0.1/KLOC |
-| JDBC in JSPs | JSP files with Connection/DriverManager | ×0.5 each |
-| Reflection in JSPs | getMethod/invoke in JSP files | ×0.3 each |
-
----
-
-## Interpreting Results
-
-### What Each Grade Means for a Team
-
-| Grade | Developer Experience | Risk Level | Recommended Action |
-|-------|---------------------|------------|-------------------|
-| A (90+) | Productive, confident | Low | Continue current practices |
-| B (80-89) | Mostly smooth | Low-Medium | Address in sprint planning |
-| C (70-79) | Friction on some areas | Medium | Allocate 20% time to tech debt |
-| D (50-69) | Frustrating, slow | High | Dedicated refactoring effort |
-| E (30-49) | Painful, risky changes | Very High | Architectural intervention |
-| F (0-29) | Dangerous, unpredictable | Critical | Consider rewrite/replace |
-
-### Tracking Progress
-Run this assessment regularly (e.g., monthly) and track the score over time.
 A healthy codebase trends upward; a decaying one trends downward.
+A 5-point improvement per sprint is a realistic target for dedicated refactoring work.
+
