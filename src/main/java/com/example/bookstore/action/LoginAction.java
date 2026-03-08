@@ -155,7 +155,7 @@ public class LoginAction extends DispatchAction implements AppConstants {
                 try { if (auditConn != null) auditConn.close(); } catch (Exception e) {}
             }
 
-            if (result == STATUS_OK) {
+            if (result == 0) {
 
                 lastLoginUser = username;
                 // Clear failed attempts on success
@@ -171,7 +171,7 @@ public class LoginAction extends DispatchAction implements AppConstants {
                 System.out.println("Login successful for: " + username + " (count=" + loginCount
                     + " elapsed=" + (System.currentTimeMillis() - loginStartTime) + "ms)");
                 return mapping.findForward(FWD_SUCCESS);
-            } else if (result == STATUS_NOT_FOUND) {
+            } else if (result == 2) {
                 request.setAttribute(ERR, "User not found");
 
                 Integer attempts = (Integer) failedAttempts.get(username);
@@ -186,7 +186,7 @@ public class LoginAction extends DispatchAction implements AppConstants {
                 }
 
                 return mapping.findForward("failure");
-            } else if (result == STATUS_UNAUTHORIZED) {
+            } else if (result == 4) {
                 request.setAttribute(ERR, "Account is inactive");
 
                 Integer attempts = (Integer) failedAttempts.get(username);
@@ -204,7 +204,7 @@ public class LoginAction extends DispatchAction implements AppConstants {
         } catch (Exception e) {
             e.printStackTrace();
             System.out.println("Login error: " + e.getMessage() + " elapsed=" + (System.currentTimeMillis() - loginStartTime) + "ms");
-            request.setAttribute(ERR, "System error during login");
+            request.setAttribute("err", "System error during login");
             return mapping.findForward("failure");
         }
     }
@@ -217,7 +217,7 @@ public class LoginAction extends DispatchAction implements AppConstants {
         try {
             HttpSession session = request.getSession(false);
             if (session != null) {
-                String username = (String) session.getAttribute(USER);
+                String username = (String) session.getAttribute("user");
                 System.out.println("Logout: " + username);
 
                 UserManager.getInstance().logAction("LOGOUT", "", "User logged out: " + username, request);
@@ -228,6 +228,6 @@ public class LoginAction extends DispatchAction implements AppConstants {
             e.printStackTrace();
         }
 
-        return mapping.findForward(FWD_SUCCESS);
+        return mapping.findForward("success");
     }
 }
