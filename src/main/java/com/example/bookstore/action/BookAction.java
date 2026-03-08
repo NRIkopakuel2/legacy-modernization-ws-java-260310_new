@@ -88,7 +88,7 @@ public class BookAction extends Action implements AppConstants {
             // Pre-validate search params
             boolean hasSearchCriteria = false;
             if (q1 != null && q1.length() > 0) hasSearchCriteria = true;
-            if (q2 != null && q2.trim().length() > 0) hasSearchCriteria = true;
+            if (q2 != null && q2.trim().isEmpty() == false) hasSearchCriteria = true;
             if (q4 != null && !q4.equals("")) hasSearchCriteria = true;
             if (q3 != null && q3.trim().length() > 0) hasSearchCriteria = true;
 

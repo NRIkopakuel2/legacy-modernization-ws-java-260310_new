@@ -625,9 +625,9 @@ public class AdminAction extends DispatchAction implements AppConstants {
                     "SELECT category_id, COUNT(*) as cnt FROM books WHERE del_flg = '0' OR del_flg IS NULL GROUP BY category_id");
                 while (rs2.next()) {
                     String catId = rs2.getString("category_id");
-                    int bookCount = rs2.getInt("cnt");
-                    bookCountMap.put(catId, String.valueOf(bookCount));
-                    totalBooksAcrossCategories = totalBooksAcrossCategories + bookCount;
+                    int cnt = rs2.getInt("cnt");
+                    bookCountMap.put(catId, String.valueOf(cnt));
+                    totalBooksAcrossCategories = totalBooksAcrossCategories + cnt;
                 }
                 System.out.println("AdminAction.categoryList: loaded book counts for "
                     + bookCountMap.size() + " categories, total books=" + totalBooksAcrossCategories);

@@ -68,7 +68,7 @@ public class SystemManager implements AppConstants {
     public String getDbUrl() {
         String cached = (String) configCache.get("db.url");
         if (cached != null) return cached;
-        return "jdbc:mysql://localhost:3306/legacy_db?useSSL=false&autoReconnect=true";
+        return "jdbc:mysql://legacy-mysql:3306/legacy_db?useSSL=false&autoReconnect=true";
     }
 
     public String getDbUser() {
@@ -132,7 +132,7 @@ public class SystemManager implements AppConstants {
         // Fall back to hardcoded defaults
         // NOTE: These defaults should eventually be moved to a properties file
         if (key.equals("db.url")) {
-            return "jdbc:mysql://localhost:3306/legacy_db?useSSL=false&autoReconnect=true";
+            return "jdbc:mysql://legacy-mysql:3306/legacy_db?useSSL=false&autoReconnect=true";
         } else if (key.equals("db.user")) {
             return "legacy_user";
         } else if (key.equals("db.pass")) {
