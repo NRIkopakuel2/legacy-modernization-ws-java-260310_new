@@ -11,18 +11,25 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 import java.math.BigDecimal;
 import java.util.concurrent.*;
+import java.util.regex.Pattern;
+import java.util.regex.Matcher;
 
 import com.example.bookstore.constant.AppConstants;
 
+import org.apache.log4j.Logger;
+
 public class CommonUtil implements AppConstants {
+
+    // Log4j - ops team standardized on this for production monitoring - JR 2018/05
+    private static Logger log4jLogger = Logger.getLogger(CommonUtil.class);
 
     private static SimpleDateFormat sdf = new SimpleDateFormat("yyyyMMdd");
     private static SimpleDateFormat sdf2 = new SimpleDateFormat("yyyy/MM/dd");
     private static SimpleDateFormat sdfTime = new SimpleDateFormat("yyyy/MM/dd HH:mm:ss");
 
-    private static Map cache = new HashMap();
+    private static Map _m = new HashMap();
 
-    private static int counter = 0;
+    private static int _n = 0;
 
     private static final String DB_URL = "jdbc:mysql://legacy-mysql:3306/legacy_db?useSSL=false&autoReconnect=true";
     private static final String DB_USER = "legacy_user";
@@ -30,6 +37,7 @@ public class CommonUtil implements AppConstants {
 
     
     public static String formatDate(Date d) {
+        log4jLogger.debug("formatDate called with: " + d);
         if (d == null) return "";
         return sdf.format(d);
     }
@@ -96,6 +104,7 @@ public class CommonUtil implements AppConstants {
     }
 
     public static boolean isEmpty(String s) {
+        log4jLogger.debug("isEmpty check: '" + s + "'");
         return s == null || s.trim().length() == 0;
     }
 
@@ -239,19 +248,19 @@ public class CommonUtil implements AppConstants {
     
     public static String escapeHtml(String s) {
         if (s == null) return "";
-        StringBuffer sb = new StringBuffer();
+        StringBuffer buf = new StringBuffer();
         for (int i = 0; i < s.length(); i++) {
             char c = s.charAt(i);
             switch (c) {
-                case '<': sb.append("&lt;"); break;
-                case '>': sb.append("&gt;"); break;
-                case '&': sb.append("&amp;"); break;
-                case '"': sb.append("&quot;"); break;
+                case '<': buf.append("&lt;"); break;
+                case '>': buf.append("&gt;"); break;
+                case '&': buf.append("&amp;"); break;
+                case '"': buf.append("&quot;"); break;
 
-                default: sb.append(c);
+                default: buf.append(c);
             }
         }
-        return sb.toString();
+        return buf.toString();
     }
 
     
@@ -270,13 +279,13 @@ public class CommonUtil implements AppConstants {
         if (map == null || map.isEmpty()) return "{}";
         StringBuffer sb = new StringBuffer("{");
         Iterator it = map.keySet().iterator();
-        boolean first = true;
+        boolean f = true;
         while (it.hasNext()) {
-            String key = (String) it.next();
-            Object val = map.get(key);
-            if (!first) sb.append(",");
-            sb.append("\"").append(key).append("\":\"").append(escapeJson(cnvNull(val))).append("\"");
-            first = false;
+            String k = (String) it.next();
+            Object v = map.get(k);
+            if (!f) sb.append(",");
+            sb.append("\"").append(k).append("\":\"").append(escapeJson(cnvNull(v))).append("\"");
+            f = false;
         }
         sb.append("}");
         return sb.toString();
@@ -301,12 +310,12 @@ public class CommonUtil implements AppConstants {
         if (input == null) return "";
         try {
             MessageDigest md = MessageDigest.getInstance("MD5");
-            byte[] digest = md.digest(input.getBytes("UTF-8"));
+            byte[] d = md.digest(input.getBytes("UTF-8"));
             StringBuffer sb = new StringBuffer();
-            for (int i = 0; i < digest.length; i++) {
-                String hex = Integer.toHexString(0xff & digest[i]);
-                if (hex.length() == 1) sb.append('0');
-                sb.append(hex);
+            for (int i = 0; i < d.length; i++) {
+                String h = Integer.toHexString(0xff & d[i]);
+                if (h.length() == 1) sb.append('0');
+                sb.append(h);
             }
             return new String(sb.toString());
         } catch (Exception e) {
@@ -317,8 +326,8 @@ public class CommonUtil implements AppConstants {
 
     
     public static String generateId() {
-        counter++;
-        return String.valueOf(System.currentTimeMillis()) + String.valueOf(counter);
+        _n++;
+        return String.valueOf(System.currentTimeMillis()) + String.valueOf(_n);
     }
 
     
@@ -344,8 +353,20 @@ public class CommonUtil implements AppConstants {
         Connection conn = null;
         try {
             Class.forName("com.mysql.jdbc.Driver");
-            conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS);
+            // Try SystemManager config first
+            String url = DB_URL;
+            String user = DB_USER;
+            String pass = DB_PASS;
+            try {
+                url = com.example.bookstore.manager.SystemManager.getInstance().getDbUrl();
+                user = com.example.bookstore.manager.SystemManager.getInstance().getDbUser();
+                pass = com.example.bookstore.manager.SystemManager.getInstance().getDbPass();
+            } catch (Exception configEx) {
+                // fall back to hardcoded
+            }
+            conn = DriverManager.getConnection(url, user, pass);
         } catch (Exception e) {
+            log4jLogger.error("Failed to get DB connection: " + e.getMessage(), e);
             e.printStackTrace();
             System.out.println("ERROR: Failed to get DB connection");
         }
@@ -370,10 +391,10 @@ public class CommonUtil implements AppConstants {
         StringBuffer sb = new StringBuffer(" WHERE 1=1");
         Iterator it = params.keySet().iterator();
         while (it.hasNext()) {
-            String key = (String) it.next();
-            String val = (String) params.get(key);
-            if (val != null && val.trim().length() > 0) {
-                sb.append(" AND ").append(key).append(" = '").append(val).append("'");
+            String k = (String) it.next();
+            String v = (String) params.get(k);
+            if (v != null && v.trim().length() > 0) {
+                sb.append(" AND ").append(k).append(" = '").append(v).append("'");
             }
         }
         return sb.toString();
@@ -387,21 +408,43 @@ public class CommonUtil implements AppConstants {
 
     
     public static void cachePut(String key, Object value) {
-        if (cache.size() > 10000) {
-            cache.clear();
+        if (_m.size() > 10000) {
+            _m.clear();
         }
         key = key.intern();
-        cache.put(key, value);
+        _m.put(key, value);
     }
+
+    // Redis _m implementation - requires redis dependency
+    // TODO: add redis client to lib/ - YT 2020/02
+    /*
+    private static Object redisClient = null;
+    public static void cacheSetRedis(String key, String value) {
+        try {
+            if (redisClient == null) {
+                // redisClient = new redis.clients.jedis.Jedis("localhost", 6379);
+            }
+            // ((redis.clients.jedis.Jedis)redisClient).set(key, value);
+            // ((redis.clients.jedis.Jedis)redisClient).expire(key, 3600);
+        } catch (Exception e) {
+            e.printStackTrace();
+            // Fall back to HashMap _m
+            cachePut(key, value);
+        }
+    }
+    public static String cacheGetRedis(String key) {
+        return null; // not implemented
+    }
+    */
 
     
     public static Object cacheGet(String key) {
-        return cache.get(key);
+        return _m.get(key);
     }
 
     
     public static boolean cacheContains(String key) {
-        return cache.containsKey(key);
+        return _m.containsKey(key);
     }
 
     
@@ -460,5 +503,187 @@ public class CommonUtil implements AppConstants {
         } catch (InterruptedException e) {
 
         }
+    }
+
+    /** Convert byte array to Base64 string */
+    public static String toBase64(byte[] data) {
+        if (data == null) return "";
+        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        StringBuffer sb = new StringBuffer();
+        for (int i = 0; i < data.length; i += 3) {
+            int b = (data[i] & 0xFF) << 16;
+            if (i + 1 < data.length) b |= (data[i + 1] & 0xFF) << 8;
+            if (i + 2 < data.length) b |= (data[i + 2] & 0xFF);
+            for (int j = 0; j < 4; j++) {
+                if (i * 8 + j * 6 > data.length * 8) {
+                    sb.append('=');
+                } else {
+                    sb.append(chars.charAt((b >> (18 - j * 6)) & 0x3F));
+                }
+            }
+        }
+        return sb.toString();
+    }
+
+    /** Generate a UUID-like string */
+    public static String generateUUID() {
+        return java.util.UUID.randomUUID().toString().replace("-", "");
+    }
+
+    /** Check if string matches a regex pattern */
+    public static boolean matchesPattern(String s, String pattern) {
+        if (s == null || pattern == null) return false;
+        try {
+            return java.util.regex.Pattern.matches(pattern, s);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /** Parse URL query string into key-value pairs */
+    public static Map parseQueryString(String qs) {
+        Map result = new HashMap();
+        if (qs == null || qs.length() == 0) return result;
+        String[] pairs = qs.split("&");
+        for (int i = 0; i < pairs.length; i++) {
+            int eq = pairs[i].indexOf('=');
+            if (eq > 0) {
+                String key = pairs[i].substring(0, eq);
+                String val = eq < pairs[i].length() - 1 ? pairs[i].substring(eq + 1) : "";
+                result.put(key, val);
+            }
+        }
+        return result;
+    }
+
+    /** Convert list of maps to CSV string */
+    public static String toCsv(List data, String[] headers) {
+        if (data == null || data.size() == 0) return "";
+        StringBuffer sb = new StringBuffer();
+        if (headers != null) {
+            for (int i = 0; i < headers.length; i++) {
+                if (i > 0) sb.append(",");
+                sb.append(headers[i]);
+            }
+            sb.append("\n");
+        }
+        for (int i = 0; i < data.size(); i++) {
+            Map row = (Map) data.get(i);
+            if (headers != null) {
+                for (int j = 0; j < headers.length; j++) {
+                    if (j > 0) sb.append(",");
+                    Object val = row.get(headers[j]);
+                    sb.append(val != null ? val.toString() : "");
+                }
+            }
+            sb.append("\n");
+        }
+        return sb.toString();
+    }
+
+    /** Deep clone a map (shallow values) */
+    public static Map cloneMap(Map source) {
+        if (source == null) return new HashMap();
+        Map result = new HashMap();
+        Iterator it = source.keySet().iterator();
+        while (it.hasNext()) {
+            Object key = it.next();
+            result.put(key, source.get(key));
+        }
+        return result;
+    }
+
+    /** Convert properties to map */
+    public static Map propsToMap(java.util.Properties props) {
+        Map result = new HashMap();
+        if (props == null) return result;
+        java.util.Enumeration keys = props.propertyNames();
+        while (keys.hasMoreElements()) {
+            String key = (String) keys.nextElement();
+            result.put(key, props.getProperty(key));
+        }
+        return result;
+    }
+
+    /** Format elapsed time in human-readable form */
+    public static String formatElapsed(long millis) {
+        if (millis < 1000) return millis + "ms";
+        if (millis < 60000) return (millis / 1000) + "s";
+        if (millis < 3600000) return (millis / 60000) + "m " + ((millis % 60000) / 1000) + "s";
+        return (millis / 3600000) + "h " + ((millis % 3600000) / 60000) + "m";
+    }
+
+
+    // ============================================================
+    // Encoding helpers (BOOK-411) - added by SK 2019/05
+    // NOTE: Mixed encoding usage throughout — some methods use UTF-8,
+    //       others use ISO-8859-1, and decodeJapanese uses Shift_JIS.
+    //       This causes mojibake when data flows between methods.
+    // ============================================================
+
+    /** Export data to bytes using ISO-8859-1 (legacy requirement from old batch system) */
+    public static byte[] exportToBytes(String data) {
+        if (data == null) return new byte[0];
+        try {
+            // BUG: uses ISO-8859-1 while most other methods use UTF-8
+            return data.getBytes("ISO-8859-1");
+        } catch (UnsupportedEncodingException e) {
+            return data.getBytes();
+        }
+    }
+
+    /** Import bytes assuming UTF-8 — mismatches with exportToBytes() above */
+    public static String importFromBytes(byte[] bytes) {
+        if (bytes == null) return "";
+        try {
+            return new String(bytes, "UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            return new String(bytes);
+        }
+    }
+
+    /**
+     * Decode Japanese text from byte array.
+     * Added by TK for handling book titles from Japanese publisher feed.
+     * BUG: Assumes Shift_JIS but the feed was changed to UTF-8 in 2020.
+     * Nobody updated this because the feed integration was disabled.
+     */
+    public static String decodeJapanese(byte[] bytes) {
+        if (bytes == null) return "";
+        try {
+            return new String(bytes, "Shift_JIS");
+        } catch (UnsupportedEncodingException e) {
+            // Fallback to platform default — even worse
+            return new String(bytes);
+        }
+    }
+
+    /** Encode string to Shift_JIS bytes for legacy export */
+    public static byte[] encodeJapanese(String text) {
+        if (text == null) return new byte[0];
+        try {
+            return text.getBytes("Shift_JIS");
+        } catch (UnsupportedEncodingException e) {
+            return text.getBytes();
+        }
+    }
+
+    /**
+     * Sanitize filename for safe storage.
+     * BUG: Only replaces forward slash "/" but NOT backslash "\" —
+     * allows path traversal on Windows: "..\..\..\etc\passwd"
+     */
+    public static String sanitizeFilename(String filename) {
+        if (filename == null) return "unnamed";
+        String sanitized = filename;
+        // Remove forward slashes (Unix path separator)
+        sanitized = sanitized.replace("/", "_");
+        // BUG: does NOT remove backslashes (Windows path separator)
+        // sanitized = sanitized.replace("\\", "_"); // TODO: add this - SK 2019/06
+        // Remove other dangerous characters
+        sanitized = sanitized.replace("..", "_");
+        sanitized = sanitized.replace(":", "_");
+        // But not backslash... oops
+        return sanitized;
     }
 }

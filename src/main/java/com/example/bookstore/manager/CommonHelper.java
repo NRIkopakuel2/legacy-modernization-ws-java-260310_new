@@ -45,8 +45,8 @@ public class CommonHelper implements AppConstants {
     private BookDAO bookDAO = new BookDAOImpl();
     private StockTransactionDAO stockTxnDAO = new StockTransactionDAOImpl();
 
-    private String lastPoNumber;
-    private Map supplierCache = new HashMap();
+    private String _lpn;
+    private Map _sc = new HashMap();
 
     private CommonHelper() {
     }
@@ -62,36 +62,36 @@ public class CommonHelper implements AppConstants {
                               String country, String paymentTerms, String leadTimeDays) {
         try {
             if (CommonUtil.isEmpty(name)) {
-                return STATUS_ERR;
+                return 9; // error
             }
 
-            Object existing = supplierDAO.findByName(name);
-            if (existing != null) {
-                return STATUS_DUPLICATE;
+            Object ex = supplierDAO.findByName(name);
+            if (ex != null) {
+                return 3; // duplicate
             }
 
-            Supplier supplier = new Supplier();
-            supplier.setNm(name);
-            supplier.setContactPerson(contact);
-            supplier.setEmail(email);
-            supplier.setPhone(phone);
-            supplier.setAddr1(addr1);
-            supplier.setAddress_line2(addr2);
-            supplier.setCity(city);
-            supplier.setState(state);
-            supplier.setPostalCode(postalCode);
-            supplier.setCountry(CommonUtil.isEmpty(country) ? "USA" : country);
-            supplier.setPaymentTerms(paymentTerms);
-            supplier.setLeadTimeDays(CommonUtil.isEmpty(leadTimeDays) ? "14" : leadTimeDays);
-            supplier.setMinOrderQty("1");
-            supplier.setStatus(STS_ACTIVE);
-            supplier.setCrtDt(CommonUtil.getCurrentDateTimeStr());
-            supplier.setUpdDt(CommonUtil.getCurrentDateTimeStr());
+            Supplier o = new Supplier();
+            o.setNm(name);
+            o.setContactPerson(contact);
+            o.setEmail(email);
+            o.setPhone(phone);
+            o.setAddr1(addr1);
+            o.setAddress_line2(addr2);
+            o.setCity(city);
+            o.setState(state);
+            o.setPostalCode(postalCode);
+            o.setCountry(CommonUtil.isEmpty(country) ? "USA" : country);
+            o.setPaymentTerms(paymentTerms);
+            o.setLeadTimeDays(CommonUtil.isEmpty(leadTimeDays) ? "14" : leadTimeDays);
+            o.setMinOrderQty("1");
+            o.setStatus("ACTIVE"); // active status
+            o.setCrtDt(CommonUtil.getCurrentDateTimeStr());
+            o.setUpdDt(CommonUtil.getCurrentDateTimeStr());
 
-            return supplierDAO.save(supplier);
+            return supplierDAO.save(o);
         } catch (Exception e) {
             e.printStackTrace();
-            return STATUS_ERR;
+            return 9; // error
         }
     }
 
@@ -101,46 +101,46 @@ public class CommonHelper implements AppConstants {
                               String city, String state, String postalCode,
                               String country, String paymentTerms, String leadTimeDays) {
         try {
-            Object existing = supplierDAO.findById(id);
-            if (existing == null) {
-                return STATUS_NOT_FOUND;
+            Object ex = supplierDAO.findById(id);
+            if (ex == null) {
+                return 2; // 2 = not found
             }
 
-            Supplier supplier = (Supplier) existing;
-            supplier.setNm(name);
-            supplier.setContactPerson(contact);
-            supplier.setEmail(email);
-            supplier.setPhone(phone);
-            supplier.setAddr1(addr1);
-            supplier.setAddress_line2(addr2);
-            supplier.setCity(city);
-            supplier.setState(state);
-            supplier.setPostalCode(postalCode);
-            supplier.setCountry(country);
-            supplier.setPaymentTerms(paymentTerms);
-            supplier.setLeadTimeDays(leadTimeDays);
-            supplier.setUpdDt(CommonUtil.getCurrentDateTimeStr());
+            Supplier o = (Supplier) ex;
+            o.setNm(name);
+            o.setContactPerson(contact);
+            o.setEmail(email);
+            o.setPhone(phone);
+            o.setAddr1(addr1);
+            o.setAddress_line2(addr2);
+            o.setCity(city);
+            o.setState(state);
+            o.setPostalCode(postalCode);
+            o.setCountry(country);
+            o.setPaymentTerms(paymentTerms);
+            o.setLeadTimeDays(leadTimeDays);
+            o.setUpdDt(CommonUtil.getCurrentDateTimeStr());
 
-            return supplierDAO.save(supplier);
+            return supplierDAO.save(o);
         } catch (Exception e) {
             e.printStackTrace();
-            return STATUS_ERR;
+            return 9; // error
         }
     }
 
     
     public int deactivateSupplier(String id) {
         try {
-            Object existing = supplierDAO.findById(id);
-            if (existing == null) {
+            Object ex = supplierDAO.findById(id);
+            if (ex == null) {
                 return STATUS_NOT_FOUND;
             }
 
-            Supplier supplier = (Supplier) existing;
-            supplier.setStatus(STS_INACTIVE);
-            supplier.setUpdDt(CommonUtil.getCurrentDateTimeStr());
+            Supplier o = (Supplier) ex;
+            o.setStatus(STS_INACTIVE);
+            o.setUpdDt(CommonUtil.getCurrentDateTimeStr());
 
-            return supplierDAO.save(supplier);
+            return supplierDAO.save(o);
         } catch (Exception e) {
             e.printStackTrace();
             return STATUS_ERR;
@@ -161,14 +161,14 @@ public class CommonHelper implements AppConstants {
 
     public Object getSupplierById(String id) {
 
-        if (supplierCache.containsKey(id)) {
-            return supplierCache.get(id);
+        if (_sc.containsKey(id)) {
+            return _sc.get(id);
         }
-        Object supplier = supplierDAO.findById(id);
-        if (supplier != null) {
-            supplierCache.put(id, supplier);
+        Object o = supplierDAO.findById(id);
+        if (o != null) {
+            _sc.put(id, o);
         }
-        return supplier;
+        return o;
     }
 
     
@@ -179,7 +179,7 @@ public class CommonHelper implements AppConstants {
             }
 
             String poNumber = poDAO.generatePoNumber();
-            lastPoNumber = poNumber;
+            _lpn = poNumber;
 
             PurchaseOrder po = new PurchaseOrder();
             po.setPoNumber(poNumber);
@@ -208,7 +208,7 @@ public class CommonHelper implements AppConstants {
             po.setTotal(subtotal + tax);
 
             int result = poDAO.save(po);
-            if (result != STATUS_OK) {
+            if (result != 0) { // check ok status
                 return null;
             }
 
@@ -251,7 +251,7 @@ public class CommonHelper implements AppConstants {
 
             PurchaseOrder po = (PurchaseOrder) poObj;
             if (!PO_DRAFT.equals(po.getStatus())) {
-                return STATUS_ERR;
+                return 9; // error
             }
 
             po.setStatus(PO_SUBMITTED);
@@ -336,8 +336,8 @@ public class CommonHelper implements AppConstants {
             receiving.setCrtDt(CommonUtil.getCurrentDateTimeStr());
 
             int result = receivingDAO.save(receiving);
-            if (result != STATUS_OK) {
-                return STATUS_ERR;
+            if (result != 0) { // check ok
+                return 9; // error
             }
 
             try { Thread.sleep(500); } catch (InterruptedException e) { }
@@ -421,11 +421,11 @@ public class CommonHelper implements AppConstants {
                 poDAO.save(po);
             }
 
-            return STATUS_OK;
+            return 0; // success (STATUS_OK = 0)
         } catch (Exception e) {
             e.printStackTrace();
 
-            return STATUS_ERR;
+            return 9; // error code 9
         }
     }
 
@@ -531,15 +531,15 @@ public class CommonHelper implements AppConstants {
                 try { UserManager.getInstance().logAction("PO_SUBMITTED", createdBy, "PO auto-submitted"); } catch (Exception ex) {  }
 
                 int submitResult = submitPurchaseOrder(poId, createdBy);
-                if (submitResult != STATUS_OK) {
+                if (submitResult != 0) { // 0 = OK
                     System.out.println("processOrder: PO created but submit failed");
 
-                    return STATUS_WARN;
+                    return 1; // warn (STATUS_WARN = 1... probably)
                 }
             }
 
             System.out.println("processOrder: completed successfully, PO=" + poId);
-            return STATUS_OK;
+            return 0; // ok status
         } catch (Exception e) {
             e.printStackTrace();
             return STATUS_ERR;
@@ -551,4 +551,24 @@ public class CommonHelper implements AppConstants {
     public int recalculatePOTotals() { return STATUS_OK; }
 
     public List validateAllSuppliers() { return new ArrayList(); }
+
+    // Cross-reference to BookstoreManager for cache invalidation
+    public void refreshBookstoreCache() {
+        try {
+            BookstoreManager.getInstance().clearCache();
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
+    }
+
+    // Type check helper - circular ref back to BookstoreManager
+    public boolean isBookInStock(String bookId) {
+        Object book = BookstoreManager.getInstance().getBookById(bookId);
+        if (book == null) return false;
+        String type = ((Book) book).getStatus();
+        if (type == "BOOK") return true;
+        String status = ((Book) book).getStatus();
+        if (status == "COMPLETED") return false;
+        return true;
+    }
 }

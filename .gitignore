@@ -100,3 +100,12 @@ host-manager*.log
 # JVM crash dumps
 hs_err_pid*.log
 core.*
+
+# Runtime artifacts (Tomcat, MariaDB data)
+.runtime/
+
+# Copilot session state
+.copilot/
+
+# Config generated at runtime
+.config/
