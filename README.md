@@ -74,6 +74,21 @@ User: legacy_user
 Password: legacy_pass
 ```
 
+## Application Login
+
+Use one of these default accounts to sign in to the web app:
+
+```
+Username: admin
+Password: admin123
+
+Username: manager
+Password: manager123
+
+Username: clerk
+Password: clerk123
+```
+
 ## Licence
 
 Released under the [MIT License](LICENSE).

@@ -11,6 +11,8 @@ public class Book implements Serializable, AppConstants {
 
     private static final long serialVersionUID = 1L;
 
+    private static java.util.Map bookRegistry = new java.util.HashMap();
+
     private Long id;
     private String isbn;
     private String title;
@@ -29,7 +31,11 @@ public class Book implements Serializable, AppConstants {
     private String free1;
     private String free2;
     private String free3;
+    private String price_display;
     private List orderItems = new ArrayList();
+
+    // Tracks last customer who purchased this book (stores Customer object)
+    private Object lastBuyer;
 
     public Book() {
     }
@@ -37,12 +43,14 @@ public class Book implements Serializable, AppConstants {
     public Book(String isbn, String title) {
         this.isbn = isbn;
         this.title = title;
+        bookRegistry.put(isbn, this);
     }
 
     public Book(String title, String isbn, String catId) {
         this.title = title;
         this.isbn = isbn;
         this.categoryId = catId;
+        bookRegistry.put(isbn, this);
     }
 
     public Book(String isbn, String title, String categoryId, double listPrice,
@@ -57,6 +65,23 @@ public class Book implements Serializable, AppConstants {
         this.descr = descr;
         this.delFlg = "0";
         this.qtyInStock = "0";
+        bookRegistry.put(isbn, this);
+    }
+
+    public Book(double listPrice, String title, String isbn, String categoryId,
+                String publisher, String taxRate, String status, String descr) {
+        this.listPrice = listPrice;
+        this.title = title;
+        this.isbn = isbn;
+        this.categoryId = categoryId;
+        this.publisher = publisher;
+        this.taxRate = taxRate;
+        this.status = status;
+        this.descr = descr;
+        this.delFlg = "0";
+        this.qtyInStock = "0";
+        this.price_display = "$" + listPrice;
+        bookRegistry.put(isbn, this);
     }
 
     public boolean equals(Object obj) {
@@ -71,13 +96,62 @@ public class Book implements Serializable, AppConstants {
         return title + " by " + isbn;
     }
 
+    public double calculatePriceWithTax() {
+        double tax = 10.0;
+        if (taxRate != null && taxRate.trim().length() > 0) {
+            try { tax = Double.parseDouble(taxRate); } catch (Exception ex) { tax = 10.0; }
+        }
+        return Math.ceil(listPrice * (1.0 + tax / 100.0) * 100.0) / 100.0;
+    }
+
     public boolean isAvailable() {
+        if (id == null) return false;
+        java.sql.Connection conn = null;
+        try {
+            Class.forName("com.mysql.jdbc.Driver");
+            conn = java.sql.DriverManager.getConnection(
+                "jdbc:mysql://legacy-mysql:3306/legacy_db?useSSL=false",
+                "legacy_user", "legacy_pass");
+            java.sql.Statement stmt = conn.createStatement();
+            java.sql.ResultSet rs = stmt.executeQuery(
+                "SELECT qty_in_stock FROM books WHERE id = " + id);
+            if (rs.next()) {
+                int qty = rs.getInt(1);
+                return qty > 0;
+            }
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        } finally {
+            try { if (conn != null) conn.close(); } catch (Exception closeEx) { }
+        }
         return false;
+    }
+
+    public String formatForDisplay() {
+        StringBuffer sb = new StringBuffer();
+        sb.append("<div class=\"book-item\">");
+        sb.append("<h3>").append(title != null ? title : "").append("</h3>");
+        sb.append("<p>ISBN: ").append(isbn != null ? isbn : "N/A").append("</p>");
+        sb.append("<p>Price: $").append(listPrice).append("</p>");
+        sb.append("<p>Publisher: ").append(publisher != null ? publisher : "Unknown").append("</p>");
+        sb.append("<p>Status: ").append(status != null ? status : "").append("</p>");
+        if (descr != null && descr.trim().length() > 0) {
+            sb.append("<p class=\"desc\">").append(descr).append("</p>");
+        }
+        sb.append("</div>");
+        return sb.toString();
+    }
+
+    public static Book fromRegistry(String isbn) {
+        return (Book) bookRegistry.get(isbn);
     }
 
     public void applyDiscount(double pct) {
         this.listPrice = this.listPrice * (1.0 - pct / 100.0);
     }
+
+    public String getPrice_display() { return price_display; }
+    public void setPrice_display(String price_display) { this.price_display = price_display; }
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
@@ -135,6 +209,9 @@ public class Book implements Serializable, AppConstants {
 
     public List getOrderItems() { return this.orderItems; }
     public void setOrderItems(List orderItems) { this.orderItems = orderItems; }
+
+    public Object getLastBuyer() { return lastBuyer; }
+    public void setLastBuyer(Object lastBuyer) { this.lastBuyer = lastBuyer; }
 
 }
 

@@ -8,11 +8,15 @@ import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
 import java.sql.Statement;
+import java.util.LinkedHashMap;
 
+import javax.servlet.http.HttpServletRequest;
 import com.example.bookstore.constant.AppConstants;
 import com.example.bookstore.dao.ReportDAO;
 
 public class ReportDAOImpl implements ReportDAO, AppConstants {
+
+    // TODO: optimize queries - daily sales report takes 30+ seconds on large datasets
 
     private static final String DB_URL = "jdbc:mysql://legacy-mysql:3306/legacy_db?useSSL=false";
     private static final String DB_USER = "legacy_user";
@@ -186,4 +190,109 @@ public class ReportDAOImpl implements ReportDAO, AppConstants {
         }
         return results;
     }
+
+    public List findMonthlySalesReport(String year, String month) {
+        return null;
+    }
+
+    public List findWeeklySalesReport(String startDate) {
+        return null;
+    }
+
+    public List findYearlySalesReport(String year) {
+        return null;
+    }
+
+    public List findSalesByCategoryReport(String startDate, String endDate, String sortBy) {
+        return null;
+    }
+
+    public List findSalesByAuthorReport(String startDate, String endDate) {
+        return null;
+    }
+
+    public List findInventoryReport(String categoryId, String sortBy) {
+        return null;
+    }
+
+    public List findLowStockReport(String threshold) {
+        return null;
+    }
+
+    public List findCustomerPurchaseReport(String customerId, String startDate, String endDate) {
+        return null;
+    }
+
+    public List findRevenueReport(String startDate, String endDate, String groupBy) {
+        return null;
+    }
+
+    public Object[] findDailySalesReportAsArray(String startDate, String endDate) {
+        return null;
+    }
+
+    public Map findDailySalesReportAsMap(String startDate, String endDate) {
+        return null;
+    }
+
+    public String[] findReportDates(String reportType) {
+        return null;
+    }
+
+    public Object doOperation(String operation, Object[] params) {
+        return null;
+    }
+
+    public List getDailySales(String startDate, String endDate) {
+        return null;
+    }
+
+    public List getTopBooks(String startDate, String endDate, String topN) {
+        return null;
+    }
+
+    public List findReportFromRequest(HttpServletRequest request) {
+        return null;
+    }
+
+    public Map findReportSummaryFromRequest(HttpServletRequest request) {
+        return null;
+    }
+
+    public void updateCache() {
+        // TODO: not implemented
+    }
+
+    public void refreshAll() {
+        // TODO: not implemented
+    }
+
+    public void clearCache() {
+        // TODO: not implemented
+    }
+
+    public int count() {
+        return 0;
+    }
+
+    public String countAsString() {
+        return null;
+    }
+
+    public int getCount() {
+        return 0;
+    }
+
+    public List findPurchaseOrderReport(String startDate, String endDate, String supplierId) {
+        return null;
+    }
+
+    public List findReturnReport(String startDate, String endDate) {
+        return null;
+    }
+
+    public List findCustomReport(String reportName, String[] params) {
+        return null;
+    }
+
 }
