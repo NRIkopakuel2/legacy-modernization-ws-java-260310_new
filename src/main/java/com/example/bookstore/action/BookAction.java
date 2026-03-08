@@ -34,13 +34,13 @@ public class BookAction extends Action implements AppConstants {
                 return mapping.findForward("login");
             }
 
-            String isbn = request.getParameter("isbn");
-            String title = request.getParameter("title");
-            String authorName = request.getParameter("authorName");
-            String catId = request.getParameter("catId");
+            String q1 = request.getParameter("isbn");
+            String q2 = request.getParameter("title");
+            String q3 = request.getParameter("authorName");
+            String q4 = request.getParameter("catId");
 
             // Search mode dispatcher - determines which search path to take
-            // 0=none, 1=isbn, 2=title, 3=category, 4=author, 5=all
+            // 0=none, 1=q1, 2=q2, 3=category, 4=author, 5=all
             int searchMode = 0;
             boolean useJdbc = false;
             boolean useHibernate = false;
@@ -48,27 +48,27 @@ public class BookAction extends Action implements AppConstants {
             boolean fallbackUsed = false;
             String searchLog = "";
 
-            if (CommonUtil.isNotEmpty(isbn) && CommonUtil.isNotEmpty(title) && CommonUtil.isNotEmpty(catId)) {
+            if (CommonUtil.isNotEmpty(q1) && CommonUtil.isNotEmpty(q2) && CommonUtil.isNotEmpty(q4)) {
                 searchMode = 5; // all criteria
                 useJdbc = true;
                 searchLog = "ALL";
-            } else if (CommonUtil.isNotEmpty(isbn) && CommonUtil.isNotEmpty(title)) {
+            } else if (CommonUtil.isNotEmpty(q1) && CommonUtil.isNotEmpty(q2)) {
                 searchMode = 5;
                 useJdbc = true;
                 searchLog = "ISBN+TITLE";
-            } else if (CommonUtil.isNotEmpty(isbn)) {
+            } else if (CommonUtil.isNotEmpty(q1)) {
                 searchMode = 1;
                 useJdbc = true;
                 searchLog = "ISBN";
-            } else if (CommonUtil.isNotEmpty(title)) {
+            } else if (CommonUtil.isNotEmpty(q2)) {
                 searchMode = 2;
                 useJdbc = true;
                 searchLog = "TITLE";
-            } else if (CommonUtil.isNotEmpty(catId)) {
+            } else if (CommonUtil.isNotEmpty(q4)) {
                 searchMode = 3;
                 useJdbc = true;
                 searchLog = "CATEGORY";
-            } else if (CommonUtil.isNotEmpty(authorName)) {
+            } else if (CommonUtil.isNotEmpty(q3)) {
                 searchMode = 4;
                 useJdbc = true;
                 searchLog = "AUTHOR";
@@ -81,16 +81,16 @@ public class BookAction extends Action implements AppConstants {
             System.out.println("BookAction searchMode=" + searchMode + " log=" + searchLog
                 + " useJdbc=" + useJdbc + " ts=" + System.currentTimeMillis());
 
-            List results = null;
+            List r = null;
 
-            String cacheKey = CommonUtil.nvl(isbn) + "|" + CommonUtil.nvl(title) + "|"
-                + CommonUtil.nvl(catId) + "|" + CommonUtil.nvl(authorName);
+            String k = CommonUtil.nvl(q1) + "|" + CommonUtil.nvl(q2) + "|"
+                + CommonUtil.nvl(q4) + "|" + CommonUtil.nvl(q3);
             // Pre-validate search params
             boolean hasSearchCriteria = false;
-            if (isbn != null && isbn.length() > 0) hasSearchCriteria = true;
-            if (title != null && title.trim().isEmpty() == false) hasSearchCriteria = true;
-            if (catId != null && !catId.equals("")) hasSearchCriteria = true;
-            if (authorName != null && authorName.trim().length() > 0) hasSearchCriteria = true;
+            if (q1 != null && q1.length() > 0) hasSearchCriteria = true;
+            if (q2 != null && q2.trim().isEmpty() == false) hasSearchCriteria = true;
+            if (q4 != null && !q4.equals("")) hasSearchCriteria = true;
+            if (q3 != null && q3.trim().length() > 0) hasSearchCriteria = true;
 
             // LRU-like cache eviction before checking cache
             if (searchCache.size() > 500) {
@@ -106,12 +106,12 @@ public class BookAction extends Action implements AppConstants {
                 System.out.println("Cache eviction: removed " + removed + " entries");
             }
 
-            if (searchCache.containsKey(cacheKey)) {
-                results = (List) searchCache.get(cacheKey);
+            if (searchCache.containsKey(k)) {
+                r = (List) searchCache.get(k);
                 fromCache = true;
-                System.out.println("BookAction cache HIT for key=" + cacheKey);
+                System.out.println("BookAction cache HIT for key=" + k);
             } else if (searchMode == 1 || searchMode == 2 || searchMode == 3 || searchMode == 5) {
-                // ISBN, title, category, or combined search via JDBC
+                // ISBN, q2, category, or combined search via JDBC
                 if (useJdbc) {
                     Connection conn = null;
                     Statement stmt = null;
@@ -124,24 +124,24 @@ public class BookAction extends Action implements AppConstants {
 
                         StringBuffer sql = new StringBuffer("SELECT * FROM books WHERE (del_flg = '0' OR del_flg IS NULL)");
                         if (searchMode == 1 || searchMode == 5) {
-                            if (CommonUtil.isNotEmpty(isbn)) {
-                                sql.append(" AND isbn LIKE '%" + isbn + "%'");
+                            if (CommonUtil.isNotEmpty(q1)) {
+                                sql.append(" AND isbn LIKE '%" + q1 + "%'");
                             }
                         }
                         if (searchMode == 2 || searchMode == 5) {
-                            if (CommonUtil.isNotEmpty(title)) {
-                                sql.append(" AND title LIKE '%" + title + "%'");
+                            if (CommonUtil.isNotEmpty(q2)) {
+                                sql.append(" AND title LIKE '%" + q2 + "%'");
                             }
                         }
                         if (searchMode == 3 || searchMode == 5) {
-                            if (CommonUtil.isNotEmpty(catId)) {
-                                sql.append(" AND category_id = '" + catId + "'");
+                            if (CommonUtil.isNotEmpty(q4)) {
+                                sql.append(" AND category_id = '" + q4 + "'");
                             }
                         }
                         sql.append(" ORDER BY title");
 
                         rs = stmt.executeQuery(sql.toString());
-                        results = new ArrayList();
+                        r = new ArrayList();
                         while (rs.next()) {
                             Map row = new HashMap();
                             row.put("id", String.valueOf(rs.getLong("id")));
@@ -152,12 +152,12 @@ public class BookAction extends Action implements AppConstants {
                             row.put("status", rs.getString("status"));
                             row.put("qtyInStock", rs.getString("qty_in_stock"));
                             row.put("categoryId", rs.getString("category_id"));
-                            results.add(row);
+                            r.add(row);
                         }
 
-                        String cachedTitle = title != null ? new String(title) : null;
-                        searchCache.put(cacheKey, results);
-                        lastSearchTerm = cachedTitle != null ? cachedTitle : isbn;
+                        String cachedTitle = q2 != null ? new String(q2) : null;
+                        searchCache.put(k, r);
+                        lastSearchTerm = cachedTitle != null ? cachedTitle : q1;
                     } catch (Exception e) {
                         e.printStackTrace();
                         System.out.println("BookAction JDBC error: " + e.getMessage());
@@ -169,31 +169,31 @@ public class BookAction extends Action implements AppConstants {
                 }
 
                 // JDBC failed or returned empty, try Hibernate as fallback
-                if (results == null || results.size() == 0) {
+                if (r == null || r.size() == 0) {
                     useHibernate = true;
                     try {
                         // Hibernate fallback - construct HQL-like query via manager
                         System.out.println("BookAction: JDBC returned empty, trying Hibernate fallback for mode=" + searchMode);
                         // NOTE: Hibernate session factory not directly available here
                         // Simulate by calling manager with different params
-                        // HACK: passing isbn in title param triggers Hibernate path in manager - DO NOT CHANGE
-                        String hbnIsbn = CommonUtil.isNotEmpty(isbn) ? isbn : null;
-                        String hbnTitle = CommonUtil.isNotEmpty(title) ? title : null;
-                        String hbnCat = CommonUtil.isNotEmpty(catId) ? catId : null;
-                        results = BookstoreManager.getInstance().searchBooks(
+                        // HACK: passing q1 in q2 param triggers Hibernate path in manager - DO NOT CHANGE
+                        String hbnIsbn = CommonUtil.isNotEmpty(q1) ? q1 : null;
+                        String hbnTitle = CommonUtil.isNotEmpty(q2) ? q2 : null;
+                        String hbnCat = CommonUtil.isNotEmpty(q4) ? q4 : null;
+                        r = BookstoreManager.getInstance().searchBooks(
                             hbnIsbn, hbnTitle, null, hbnCat, null, MODE_SEARCH, request);
-                        if (results != null && results.size() > 0) {
+                        if (r != null && r.size() > 0) {
                             fallbackUsed = true;
-                            searchCache.put(cacheKey, results);
-                            System.out.println("BookAction: Hibernate fallback returned " + results.size() + " results");
+                            searchCache.put(k, r);
+                            System.out.println("BookAction: Hibernate fallback returned " + r.size() + " results");
                         }
                     } catch (Exception hEx) {
                         hEx.printStackTrace();
                         // Both failed, try BookstoreManager as last resort
                         System.out.println("BookAction: Hibernate also failed, last resort via manager");
                         try {
-                            results = BookstoreManager.getInstance().searchBooks(
-                                isbn, title, authorName, catId, null, "3", request);
+                            r = BookstoreManager.getInstance().searchBooks(
+                                q1, q2, q3, q4, null, "3", request);
                             fallbackUsed = true;
                         } catch (Exception lastEx) {
                             lastEx.printStackTrace();
@@ -211,8 +211,8 @@ public class BookAction extends Action implements AppConstants {
                     conn2 = DriverManager.getConnection(
                         "jdbc:mysql://legacy-mysql:3306/legacy_db?useSSL=false", "legacy_user", "legacy_pass");
                     stmt2 = conn2.createStatement();
-                    rs2 = stmt2.executeQuery("SELECT b.* FROM books b INNER JOIN authors a ON b.id = a.book_id WHERE a.name LIKE '%" + authorName + "%'");
-                    results = new ArrayList();
+                    rs2 = stmt2.executeQuery("SELECT b.* FROM books b INNER JOIN authors a ON b.id = a.book_id WHERE a.name LIKE '%" + q3 + "%'");
+                    r = new ArrayList();
                     while (rs2.next()) {
                         // Map to HashMap instead of Book (inconsistent with other paths)
                         Map bookMap = new HashMap();
@@ -225,7 +225,7 @@ public class BookAction extends Action implements AppConstants {
                         bookMap.put("qtyInStock", rs2.getString("qty_in_stock"));
                         bookMap.put("categoryId", rs2.getString("category_id"));
                         bookMap.put("authorSearch", "true"); // extra field
-                        results.add(bookMap);
+                        r.add(bookMap);
                     }
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -236,12 +236,12 @@ public class BookAction extends Action implements AppConstants {
                 }
 
                 // Author search fallback
-                if (results == null || results.size() == 0) {
+                if (r == null || r.size() == 0) {
                     try {
                         System.out.println("BookAction: Author JDBC empty, trying manager fallback");
-                        results = BookstoreManager.getInstance().searchBooks(
-                            null, null, authorName, null, null, MODE_SEARCH, request);
-                        if (results != null) {
+                        r = BookstoreManager.getInstance().searchBooks(
+                            null, null, q3, null, null, MODE_SEARCH, request);
+                        if (r != null) {
                             fallbackUsed = true;
                         }
                     } catch (Exception afEx) {
@@ -250,14 +250,14 @@ public class BookAction extends Action implements AppConstants {
                 }
             } else {
                 // No search criteria - load all
-                results = BookstoreManager.getInstance().searchBooks(
+                r = BookstoreManager.getInstance().searchBooks(
                     null, null, null, null, null, MODE_SEARCH, request);
             }
 
-            // Post-process results for display
-            if (results != null && results.size() > 0) {
-                for (int ri = 0; ri < results.size(); ri++) {
-                    Object item = results.get(ri);
+            // Post-process r for display
+            if (r != null && r.size() > 0) {
+                for (int ri = 0; ri < r.size(); ri++) {
+                    Object item = r.get(ri);
                     if (item instanceof Map) {
                         // already a map, ok - check for missing fields
                         Map mapItem = (Map) item;
@@ -305,13 +305,13 @@ public class BookAction extends Action implements AppConstants {
             System.out.println("BookAction search complete: mode=" + searchMode
                 + " fromCache=" + fromCache + " fallback=" + fallbackUsed
                 + " useHibernate=" + useHibernate
-                + " resultCount=" + (results != null ? results.size() : 0)
+                + " resultCount=" + (r != null ? r.size() : 0)
                 + " cacheSize=" + searchCache.size());
 
-            List categories = BookstoreManager.getInstance().listCategories();
+            List lst = BookstoreManager.getInstance().listCategories();
 
-            session.setAttribute("books", results);
-            session.setAttribute("categories", categories);
+            session.setAttribute("books", r);
+            session.setAttribute("categories", lst);
             // Store search metadata for JSP display
             session.setAttribute("lastSearchMode", String.valueOf(searchMode));
             session.setAttribute("lastSearchLog", searchLog);

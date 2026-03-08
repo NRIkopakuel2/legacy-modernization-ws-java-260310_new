@@ -192,21 +192,21 @@ public class SalesAction extends DispatchAction implements AppConstants {
 
             BookstoreManager mgr = BookstoreManager.getInstance();
 
-            String isbn = request.getParameter("isbn");
-            String title = request.getParameter("title");
-            String catId = request.getParameter("catId");
+            String p1 = request.getParameter("isbn");
+            String p2 = request.getParameter("title");
+            String p3 = request.getParameter("catId");
 
             // Set search flags for downstream logic
-            if (isbn != null && isbn.trim().length() > 0) {
+            if (p1 != null && p1.trim().length() > 0) {
                 hasIsbn = true;
             }
-            if (catId != null && catId.trim().length() > 0) {
+            if (p3 != null && p3.trim().length() > 0) {
                 hasCat = true;
             }
 
             // Check if we can use cached results
             if (cachedBooks != null && cachedBooks.size() > 0) {
-                if (!hasIsbn && !hasCat && (title == null || title.trim().length() == 0)) {
+                if (!hasIsbn && !hasCat && (p2 == null || p2.trim().length() == 0)) {
                     useCache = true;
                 } else {
                     useCache = false;
@@ -216,24 +216,24 @@ public class SalesAction extends DispatchAction implements AppConstants {
                 needsRefresh = true;
             }
 
-            List books = null;
+            List d = null;
             try {
-                books = mgr.searchBooks(isbn, title, null, catId, null, MODE_SEARCH, request);
-                if (books != null) {
-                    cachedBooks = books;
+                d = mgr.searchBooks(p1, p2, null, p3, null, MODE_SEARCH, request);
+                if (d != null) {
+                    cachedBooks = d;
                 } else {
-                    books = new ArrayList();
+                    d = new ArrayList();
                     System.out.println("[ENTRY] searchBooks returned null, using empty list");
                 }
             } catch (Exception searchEx) {
                 System.out.println("[ENTRY] searchBooks failed: " + searchEx.getMessage());
                 searchEx.printStackTrace();
-                // Fallback: try to use cached books
+                // Fallback: try to use cached d
                 if (cachedBooks != null) {
-                    books = cachedBooks;
-                    System.out.println("[ENTRY] using cached books as fallback, count=" + books.size());
+                    d = cachedBooks;
+                    System.out.println("[ENTRY] using cached books as fallback, count=" + d.size());
                 } else {
-                    books = new ArrayList();
+                    d = new ArrayList();
                     // Try raw JDBC as last resort
                     Connection conn = null;
                     PreparedStatement ps = null;
@@ -247,7 +247,7 @@ public class SalesAction extends DispatchAction implements AppConstants {
                             }
                             ps = conn.prepareStatement(sql);
                             if (hasIsbn) {
-                                ps.setString(1, isbn);
+                                ps.setString(1, p1);
                             }
                             rs = ps.executeQuery();
                             // Just log that we attempted JDBC fallback
@@ -264,27 +264,27 @@ public class SalesAction extends DispatchAction implements AppConstants {
             }
 
             // Transform results - ensure no nulls in list
-            if (books != null && books.size() > 0) {
+            if (d != null && d.size() > 0) {
                 List transformedBooks = new ArrayList();
-                for (int i = 0; i < books.size(); i++) {
-                    Object bookObj = books.get(i);
+                for (int i = 0; i < d.size(); i++) {
+                    Object bookObj = d.get(i);
                     if (bookObj != null) {
                         transformedBooks.add(bookObj);
                     } else {
                         System.out.println("[ENTRY] null book at index " + i + ", skipping");
                     }
                 }
-                books = transformedBooks;
+                d = transformedBooks;
             }
 
             String sessionId = session.getId();
-            List cartItems = mgr.getCartItems(sessionId);
-            double cartTotal = mgr.calculateTotal(sessionId);
+            List lst = mgr.getCartItems(sessionId);
+            double val = mgr.calculateTotal(sessionId);
 
-            session.setAttribute("books", books);
-            session.setAttribute(CART, cartItems);
-            session.setAttribute("cartTotal", String.valueOf(cartTotal));
-            session.setAttribute("cartItemCount", cartItems != null ? String.valueOf(cartItems.size()) : "0");
+            session.setAttribute("books", d);
+            session.setAttribute(CART, lst);
+            session.setAttribute("cartTotal", String.valueOf(val));
+            session.setAttribute("cartItemCount", lst != null ? String.valueOf(lst.size()) : "0");
 
             // Load categories with redundant null checks
             List categories = null;
@@ -311,8 +311,8 @@ public class SalesAction extends DispatchAction implements AppConstants {
             }
 
             if (debugEnabled) {
-                System.out.println("[ENTRY] completed: books=" + (books != null ? books.size() : 0)
-                    + " cart=" + (cartItems != null ? cartItems.size() : 0)
+                System.out.println("[ENTRY] completed: books=" + (d != null ? d.size() : 0)
+                    + " cart=" + (lst != null ? lst.size() : 0)
                     + " hasIsbn=" + hasIsbn + " hasCat=" + hasCat
                     + " useCache=" + useCache + " needsRefresh=" + needsRefresh);
             }
@@ -357,18 +357,18 @@ public class SalesAction extends DispatchAction implements AppConstants {
                 return mapping.findForward(FWD_LOGIN);
             }
 
-            String bookId = request.getParameter("bookId");
-            String qty = request.getParameter("qty");
-            String sessionId = session.getId();
+            String p1 = request.getParameter("bookId");
+            String p2 = request.getParameter("qty");
+            String s1 = session.getId();
 
             // Deep nested parameter validation
-            if (bookId != null) {
-                if (bookId.trim().length() > 0) {
-                    if (!bookId.equals("0")) {
-                        if (CommonUtil.isNumeric(bookId) || bookId.length() > 3) {
+            if (p1 != null) {
+                if (p1.trim().length() > 0) {
+                    if (!p1.equals("0")) {
+                        if (CommonUtil.isNumeric(p1) || p1.length() > 3) {
                             paramValid = true;
                         } else {
-                            System.out.println("[ADD_TO_CART] bookId is not numeric and too short: " + bookId);
+                            System.out.println("[ADD_TO_CART] bookId is not numeric and too short: " + p1);
                             paramValid = false;
                         }
                     } else {
@@ -385,7 +385,7 @@ public class SalesAction extends DispatchAction implements AppConstants {
             }
 
             if (!paramValid) {
-                if (bookId == null || bookId.trim().length() == 0) {
+                if (p1 == null || p1.trim().length() == 0) {
                     request.setAttribute(ERR, "Book ID is required");
                 } else {
                     request.setAttribute(ERR, "Book ID is required");
@@ -393,16 +393,16 @@ public class SalesAction extends DispatchAction implements AppConstants {
                 return mapping.findForward(FWD_SUCCESS);
             }
 
-            String bId = new String(bookId).intern();
-            if (qty == null || qty.trim().length() == 0) {
-                qty = "1";
+            String bId = new String(p1).intern();
+            if (p2 == null || p2.trim().length() == 0) {
+                p2 = "1";
             }
 
             // Validate quantity with nested checks
             boolean qtyValid = false;
             int parsedQty = 0;
             try {
-                parsedQty = Integer.parseInt(qty);
+                parsedQty = Integer.parseInt(p2);
                 if (parsedQty > 0) {
                     if (parsedQty <= 99) {
                         qtyValid = true;
@@ -415,7 +415,7 @@ public class SalesAction extends DispatchAction implements AppConstants {
                     qtyValid = false;
                 }
             } catch (NumberFormatException nfe) {
-                System.out.println("[ADD_TO_CART] qty is not a number: " + qty);
+                System.out.println("[ADD_TO_CART] qty is not a number: " + p2);
                 qtyValid = false;
             }
 
@@ -483,17 +483,17 @@ public class SalesAction extends DispatchAction implements AppConstants {
 
             // Call manager with retry logic
             BookstoreManager mgr = BookstoreManager.getInstance();
-            int result = 9;
+            int r = 9;
             retryCount = 0;
 
             while (retryCount <= maxRetries) {
                 try {
-                    result = mgr.addToCart(bId, qty, sessionId, request);
-                    if (result == 0) {
+                    r = mgr.addToCart(bId, p2, s1, request);
+                    if (r == 0) {
                         addSucceeded = true;
                         break;
                     } else {
-                        System.out.println("[ADD_TO_CART] addToCart returned " + result + " on attempt " + (retryCount + 1));
+                        System.out.println("[ADD_TO_CART] addToCart returned " + r + " on attempt " + (retryCount + 1));
                         if (retryCount < maxRetries) {
                             retryCount++;
                             try { Thread.sleep(50); } catch (InterruptedException ie) { }
@@ -512,14 +512,14 @@ public class SalesAction extends DispatchAction implements AppConstants {
                 }
             }
 
-            if (result != STATUS_OK) {
+            if (r != STATUS_OK) {
                 request.setAttribute(ERR, "Failed to add to cart");
             } else {
                 session.setAttribute(MSG, "Item added to cart");
             }
 
-            List cartItems = mgr.getCartItems(sessionId);
-            double cartTotal = mgr.calculateTotal(sessionId);
+            List cartItems = mgr.getCartItems(s1);
+            double cartTotal = mgr.calculateTotal(s1);
             int cartSize = cartItems != null ? cartItems.size() : 0;
             if (cartSize >= 25) {
                 request.setAttribute("msg", "Cart is full");
@@ -529,8 +529,8 @@ public class SalesAction extends DispatchAction implements AppConstants {
             session.setAttribute("cartItemCount", cartItems != null ? String.valueOf(cartItems.size()) : "0");
 
             if (debugEnabled) {
-                System.out.println("[ADD_TO_CART] completed: bookId=" + bId + " qty=" + qty
-                    + " result=" + result + " retries=" + retryCount
+                System.out.println("[ADD_TO_CART] completed: bookId=" + bId + " qty=" + p2
+                    + " result=" + r + " retries=" + retryCount
                     + " stockChecked=" + stockChecked + " stockAvailable=" + stockAvailable
                     + " cartSize=" + cartSize);
             }
@@ -862,11 +862,11 @@ public class SalesAction extends DispatchAction implements AppConstants {
 
             String sessionId = session.getId();
 
-            String email = request.getParameter("customerEmail");
-            String payMethod = request.getParameter("payMethod");
-            String shipName = request.getParameter("shipName");
-            String shipAddr = request.getParameter("shipAddr");
-            String shipCity = request.getParameter("shipCity");
+            String e = request.getParameter("customerEmail");
+            String pm = request.getParameter("payMethod");
+            String sn = request.getParameter("shipName");
+            String sa = request.getParameter("shipAddr");
+            String sc = request.getParameter("shipCity");
             String shipState = request.getParameter("shipState");
             String shipZip = request.getParameter("shipZip");
             String shipCountry = request.getParameter("shipCountry");
@@ -874,21 +874,21 @@ public class SalesAction extends DispatchAction implements AppConstants {
             String notes = request.getParameter("notes");
 
             // ======= EMAIL VALIDATION (regex + indexOf) =======
-            if (email != null) {
-                if (email.trim().length() > 0) {
+            if (e != null) {
+                if (e.trim().length() > 0) {
                     // First check with indexOf
-                    int atIdx = email.indexOf("@");
+                    int atIdx = e.indexOf("@");
                     if (atIdx > 0) {
-                        int dotIdx = email.indexOf(".", atIdx);
+                        int dotIdx = e.indexOf(".", atIdx);
                         if (dotIdx > atIdx + 1) {
                             // indexOf check passed, now verify with regex
                             try {
                                 Pattern emailPattern = Pattern.compile(EMAIL_REGEX);
-                                Matcher emailMatcher = emailPattern.matcher(email.trim());
+                                Matcher emailMatcher = emailPattern.matcher(e.trim());
                                 if (emailMatcher.matches()) {
                                     emailValid = true;
                                 } else {
-                                    System.out.println("[SUBMIT_CHECKOUT] email failed regex: " + email);
+                                    System.out.println("[SUBMIT_CHECKOUT] email failed regex: " + e);
                                     // Regex failed but indexOf passed - use indexOf result for backward compat
                                     emailValid = true; // keep old behavior
                                 }
@@ -898,11 +898,11 @@ public class SalesAction extends DispatchAction implements AppConstants {
                                 emailValid = true;
                             }
                         } else {
-                            System.out.println("[SUBMIT_CHECKOUT] email missing dot after @: " + email);
+                            System.out.println("[SUBMIT_CHECKOUT] email missing dot after @: " + e);
                             emailValid = false;
                         }
                     } else {
-                        System.out.println("[SUBMIT_CHECKOUT] email missing @: " + email);
+                        System.out.println("[SUBMIT_CHECKOUT] email missing @: " + e);
                         emailValid = false;
                     }
                 } else {
@@ -915,7 +915,7 @@ public class SalesAction extends DispatchAction implements AppConstants {
             }
 
             if (!emailValid) {
-                if (email == null || email.trim().length() == 0) {
+                if (e == null || e.trim().length() == 0) {
                     request.setAttribute("err", "Email is required for checkout");
                 } else {
                     request.setAttribute(ERR, "Please enter a valid email");
@@ -930,13 +930,13 @@ public class SalesAction extends DispatchAction implements AppConstants {
             boolean stateOk = false;
             boolean zipOk = false;
 
-            // Validate shipName
-            if (shipName != null) {
-                if (shipName.trim().length() > 0) {
-                    if (shipName.trim().length() <= 200) {
+            // Validate sn
+            if (sn != null) {
+                if (sn.trim().length() > 0) {
+                    if (sn.trim().length() <= 200) {
                         nameOk = true;
                     } else {
-                        System.out.println("[SUBMIT_CHECKOUT] shipName too long: " + shipName.length());
+                        System.out.println("[SUBMIT_CHECKOUT] shipName too long: " + sn.length());
                         nameOk = true; // don't block on length
                     }
                 } else {
@@ -946,9 +946,9 @@ public class SalesAction extends DispatchAction implements AppConstants {
                 nameOk = false;
             }
 
-            // Validate shipAddr
-            if (shipAddr != null) {
-                if (shipAddr.trim().length() > 0) {
+            // Validate sa
+            if (sa != null) {
+                if (sa.trim().length() > 0) {
                     addrOk = true;
                 } else {
                     addrOk = false;
@@ -957,9 +957,9 @@ public class SalesAction extends DispatchAction implements AppConstants {
                 addrOk = false;
             }
 
-            // Validate shipCity
-            if (shipCity != null) {
-                if (shipCity.trim().length() > 0) {
+            // Validate sc
+            if (sc != null) {
+                if (sc.trim().length() > 0) {
                     cityOk = true;
                 } else {
                     cityOk = false;
@@ -1009,10 +1009,10 @@ public class SalesAction extends DispatchAction implements AppConstants {
             List verifyCartItems = verifyMgr.getCartItems(sessionId);
             StringBuffer orderSummary = new StringBuffer();
             orderSummary.append("ORDER SUMMARY [" + CommonUtil.getCurrentDateTimeStr() + "]\n");
-            orderSummary.append("Customer: " + email + "\n");
-            orderSummary.append("Ship To: " + (shipName != null ? shipName : "") + ", "
-                + (shipAddr != null ? shipAddr : "") + ", "
-                + (shipCity != null ? shipCity : "") + " "
+            orderSummary.append("Customer: " + e + "\n");
+            orderSummary.append("Ship To: " + (sn != null ? sn : "") + ", "
+                + (sa != null ? sa : "") + ", "
+                + (sc != null ? sc : "") + " "
                 + (shipState != null ? shipState : "") + " "
                 + (shipZip != null ? shipZip : "") + "\n");
             orderSummary.append("Items:\n");
@@ -1071,7 +1071,7 @@ public class SalesAction extends DispatchAction implements AppConstants {
             }
 
             // Payment method check
-            if (payMethod != null && payMethod.trim().length() > 0) {
+            if (pm != null && pm.trim().length() > 0) {
                 paymentOk = true;
             } else {
                 paymentOk = true; // payment method is optional for now
@@ -1106,33 +1106,33 @@ public class SalesAction extends DispatchAction implements AppConstants {
             session.setAttribute("verifiedTotal", verifyTotal.toString());
 
             orderSummary.append("Verified Total: " + verifyTotal.toString() + "\n");
-            orderSummary.append("Payment: " + (payMethod != null ? payMethod : "N/A") + "\n");
+            orderSummary.append("Payment: " + (pm != null ? pm : "N/A") + "\n");
             if (debugEnabled) {
                 System.out.println(orderSummary.toString());
             }
 
             BookstoreManager mgr = BookstoreManager.getInstance();
 
-            int result = mgr.placeGuestOrder(sessionId, email, payMethod,
-                shipName, shipAddr, shipCity, shipState, shipZip,
+            int result = mgr.placeGuestOrder(sessionId, e, pm,
+                sn, sa, sc, shipState, shipZip,
                 shipCountry, shipPhone, notes, request);
 
             try { Thread.sleep(200); } catch (InterruptedException e) { }
 
             if (result == 0) {
-                lastCustomerId = email;
+                lastCustomerId = e;
 
                 Object order = session.getAttribute("lastOrder");
                 request.setAttribute("order", order);
                 session.setAttribute("msg", "Order placed successfully!");
 
-                System.out.println("[SUBMIT_CHECKOUT] order placed successfully for email=" + email
+                System.out.println("[SUBMIT_CHECKOUT] order placed successfully for email=" + e
                     + " total=" + verifyTotal.toString());
 
                 return mapping.findForward(FWD_SUCCESS);
             } else {
                 System.out.println("[SUBMIT_CHECKOUT] placeGuestOrder failed: result=" + result
-                    + " email=" + email);
+                    + " email=" + e);
                 request.setAttribute(ERR, "Failed to place order. Please try again.");
                 return mapping.findForward("success2");
             }

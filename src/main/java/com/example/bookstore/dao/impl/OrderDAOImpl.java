@@ -29,21 +29,21 @@ public class OrderDAOImpl implements OrderDAO, AppConstants {
     
     public Object findById(String id) {
         queryCount++;
-        Session session = null;
-        Object result = null;
+        Session s = null;
+        Object r = null;
         try {
-            session = HibernateUtil.getSessionFactory().openSession();
-            Query query = session.createQuery("FROM Order WHERE id = :id");
-            query.setParameter("id", new Long(id));
-            result = query.uniqueResult();
+            s = HibernateUtil.getSessionFactory().openSession();
+            Query q = s.createQuery("FROM Order WHERE id = :id");
+            q.setParameter("id", new Long(id));
+            r = q.uniqueResult();
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
-            if (session != null) {
-                try { session.close(); } catch (Exception e) { /* will retry later */ }
+            if (s != null) {
+                try { s.close(); } catch (Exception e) { /* will retry later */ }
             }
         }
-        return result;
+        return r;
     }
 
     
@@ -90,36 +90,36 @@ public class OrderDAOImpl implements OrderDAO, AppConstants {
     
     public List findByStatus(String status) {
         queryCount++;
-        Session session = null;
-        List results = null;
+        Session s = null;
+        List r = null;
         try {
-            session = HibernateUtil.getSessionFactory().openSession();
-            Query query = session.createQuery("FROM Order WHERE status = :status");
+            s = HibernateUtil.getSessionFactory().openSession();
+            Query query = s.createQuery("FROM Order WHERE status = :status");
             query.setParameter("status", status);
-            results = query.list();
+            r = query.list();
         } catch (Exception e) {
             e.printStackTrace();
             return null;
         } finally {
-            if (session != null) {
-                try { session.close(); } catch (Exception e) { }
+            if (s != null) {
+                try { s.close(); } catch (Exception e) { }
             }
         }
-        return results;
+        return r;
     }
 
     
     public List findByDateRange(String fromDate, String toDate) {
         queryCount++;
         List results = new ArrayList();
-        Connection conn = null;
+        Connection c = null;
         Statement stmt = null;
         ResultSet rs = null;
         try {
             Class.forName("com.mysql.jdbc.Driver");
-            conn = DriverManager.getConnection(
+            c = DriverManager.getConnection(
                 "jdbc:mysql://legacy-mysql:3306/legacy_db?useSSL=false", "legacy_user", "legacy_pass");
-            stmt = conn.createStatement();
+            stmt = c.createStatement();
 
             String sql = "SELECT * FROM orders WHERE order_dt >= '" + fromDate + "' AND order_dt <= '" + toDate + "' ORDER BY order_dt DESC";
             rs = stmt.executeQuery(sql);
@@ -144,7 +144,7 @@ public class OrderDAOImpl implements OrderDAO, AppConstants {
         } finally {
             try { if (rs != null) rs.close(); } catch (Exception e) { }
             try { if (stmt != null) stmt.close(); } catch (Exception e) { }
-            try { if (conn != null) conn.close(); } catch (Exception e) { }
+            try { if (c != null) c.close(); } catch (Exception e) { }
         }
         return results;
     }
