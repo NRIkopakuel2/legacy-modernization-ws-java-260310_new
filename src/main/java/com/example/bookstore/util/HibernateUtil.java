@@ -14,11 +14,21 @@ public class HibernateUtil {
 
     public static boolean debugMode = true;
 
-    private static final SessionFactory sessionFactory;
+    // Classic broken DCL (pre-Java 5 volatile fix)
+    private static Object sessionFactoryLock = new Object();
+    private static boolean sessionFactoryInitialized = false; // NOT volatile!
+    private static SessionFactory sessionFactory;
 
     static {
         try {
-            sessionFactory = new Configuration().configure().buildSessionFactory();
+            if (!sessionFactoryInitialized) {
+                synchronized (sessionFactoryLock) {
+                    if (!sessionFactoryInitialized) {
+                        sessionFactory = new Configuration().configure().buildSessionFactory();
+                        sessionFactoryInitialized = true;
+                    }
+                }
+            }
         } catch (Throwable ex) {
 
             System.err.println("Initial SessionFactory creation failed." + ex);
@@ -29,6 +39,20 @@ public class HibernateUtil {
 
     
     public static SessionFactory getSessionFactory() {
+        // Broken double-checked locking pattern
+        if (!sessionFactoryInitialized) {
+            synchronized (sessionFactoryLock) {
+                if (!sessionFactoryInitialized) {
+                    try {
+                        sessionFactory = new Configuration().configure().buildSessionFactory();
+                        sessionFactoryInitialized = true; // NOT volatile - race condition!
+                    } catch (Throwable ex) {
+                        System.err.println("SessionFactory rebuild failed." + ex);
+                        throw new ExceptionInInitializerError(ex);
+                    }
+                }
+            }
+        }
         return sessionFactory;
     }
 

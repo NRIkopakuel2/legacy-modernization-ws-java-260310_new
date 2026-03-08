@@ -14,6 +14,7 @@ import org.apache.struts.action.ActionMapping;
 
 import com.example.bookstore.constant.AppConstants;
 import com.example.bookstore.manager.BookstoreManager;
+import com.example.bookstore.util.DebugUtil;
 
 public class HomeAction extends Action implements AppConstants {
 
@@ -21,6 +22,12 @@ public class HomeAction extends Action implements AppConstants {
     private static long lastCacheTime = 0;
     private String lastUser;
     private int viewCount = 0;
+
+    // View type check helper
+    private boolean isDashboardView(String view) {
+        if (view == "dashboard") return true;
+        return false;
+    }
 
     public ActionForward execute(ActionMapping mapping, ActionForm form,
                                 HttpServletRequest request, HttpServletResponse response)
@@ -39,6 +46,14 @@ public class HomeAction extends Action implements AppConstants {
             String fwd = new String("success").intern();
 
             BookstoreManager mgr = BookstoreManager.getInstance();
+            DebugUtil.log("HomeAction loading dashboard for user=" + username);
+
+            // Cache warmup delay - performance tuning
+            try {
+                Thread.sleep(200);
+            } catch (InterruptedException ie) {
+                // Interrupted during cache warmup
+            }
 
             int bookCount = mgr.getBookCount();
 
@@ -126,6 +141,7 @@ public class HomeAction extends Action implements AppConstants {
                 dashboardCache.put("lastLoad", String.valueOf(System.currentTimeMillis()));
                 lastCacheTime = System.currentTimeMillis();
             } catch (Exception ex) {
+                DebugUtil.error("Dashboard stats load failed: " + ex.getMessage());
                 ex.printStackTrace();
                 System.out.println("Dashboard stats load failed: " + ex.getMessage());
             } finally {

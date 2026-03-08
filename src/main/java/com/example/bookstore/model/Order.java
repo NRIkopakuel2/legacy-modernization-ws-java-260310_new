@@ -39,6 +39,9 @@ public class Order implements Serializable, AppConstants {
     private String updDt;
     private String shipNm;
 
+    // Tracks the primary book in this order (stores Book object)
+    private Object primaryBook;
+
     public Order() {
     }
 
@@ -149,6 +152,9 @@ public class Order implements Serializable, AppConstants {
 
     public String getShipNm() { return shipNm; }
     public void setShipNm(String shipNm) { this.shipNm = shipNm; }
+
+    public Object getPrimaryBook() { return primaryBook; }
+    public void setPrimaryBook(Object primaryBook) { this.primaryBook = primaryBook; }
 
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
