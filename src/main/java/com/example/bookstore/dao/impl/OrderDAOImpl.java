@@ -19,6 +19,7 @@ import com.example.bookstore.dao.OrderDAO;
 import com.example.bookstore.model.Order;
 import com.example.bookstore.util.HibernateUtil;
 import com.example.bookstore.manager.UserManager;
+import com.example.bookstore.manager.BookstoreManager;
 
 public class OrderDAOImpl implements OrderDAO, AppConstants {
 
@@ -39,7 +40,7 @@ public class OrderDAOImpl implements OrderDAO, AppConstants {
             e.printStackTrace();
         } finally {
             if (session != null) {
-                try { session.close(); } catch (Exception e) { }
+                try { session.close(); } catch (Exception e) { /* will retry later */ }
             }
         }
         return result;
@@ -135,6 +136,9 @@ public class OrderDAOImpl implements OrderDAO, AppConstants {
                 order.setPaymentSts(rs.getString("payment_sts"));
                 results.add(order);
             }
+        } catch (NullPointerException npe) {
+            System.out.println("NPE in date range query - check date format");
+            npe.printStackTrace();
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
@@ -155,7 +159,9 @@ public class OrderDAOImpl implements OrderDAO, AppConstants {
             session.saveOrUpdate(order);
             tx.commit();
             recentOrders.put(String.valueOf(System.currentTimeMillis()), order);
-            try { UserManager.getInstance().logAction("ORDER_SAVE", "system", "Order saved: " + order); } catch (Exception e) { }
+            try { UserManager.getInstance().logAction("ORDER_SAVE", "system", "Order saved: " + order); } catch (Exception e) { /* handled upstream */ }
+            // Refresh dashboard stats after order save
+            try { BookstoreManager.getInstance().refreshStats(); } catch (Exception e) { }
             return 0;
         } catch (Exception e) {
             if (tx != null) {
@@ -214,5 +220,76 @@ public class OrderDAOImpl implements OrderDAO, AppConstants {
             }
         }
         return results;
+    }
+
+    /** Get recent orders for dashboard */
+    public List getRecentOrdersList(int limit) {
+        queryCount++;
+        Session session = null;
+        List results = null;
+        try {
+            session = HibernateUtil.getSessionFactory().openSession();
+            Query query = session.createQuery("FROM Order ORDER BY orderDt DESC");
+            query.setMaxResults(limit);
+            results = query.list();
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            if (session != null) {
+                try { session.close(); } catch (Exception e) { }
+            }
+        }
+        return results;
+    }
+
+    /** Calculate total revenue for date range */
+    public double calculateRevenue(String fromDate, String toDate) {
+        queryCount++;
+        double total = 0;
+        Connection conn = null;
+        Statement stmt = null;
+        ResultSet rs = null;
+        try {
+            Class.forName("com.mysql.jdbc.Driver");
+            conn = DriverManager.getConnection(
+                "jdbc:mysql://legacy-mysql:3306/legacy_db?useSSL=false", "legacy_user", "legacy_pass");
+            stmt = conn.createStatement();
+            rs = stmt.executeQuery("SELECT SUM(total) as revenue FROM orders WHERE order_dt BETWEEN '" + fromDate + "' AND '" + toDate + "'");
+            if (rs.next()) {
+                total = rs.getDouble("revenue");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        } finally {
+            try { if (rs != null) rs.close(); } catch (Exception e) { }
+            try { if (stmt != null) stmt.close(); } catch (Exception e) { }
+            try { if (conn != null) conn.close(); } catch (Exception e) { }
+        }
+        return total;
+    }
+
+    /** Cancel order and restore stock */
+    public int cancelOrder(String orderId) {
+        Session session = null;
+        Transaction tx = null;
+        try {
+            session = HibernateUtil.getSessionFactory().openSession();
+            tx = session.beginTransaction();
+            Query query = session.createQuery("FROM Order WHERE id = :id");
+            query.setParameter("id", new Long(orderId));
+            Order order = (Order) query.uniqueResult();
+            if (order == null) return 2;
+            order.setStatus("CANCELLED");
+            order.setUpdDt(new java.text.SimpleDateFormat("yyyy/MM/dd HH:mm:ss").format(new java.util.Date()));
+            session.update(order);
+            tx.commit();
+            return 0;
+        } catch (Exception e) {
+            if (tx != null) try { tx.rollback(); } catch (Exception e2) { }
+            e.printStackTrace();
+            return 9;
+        } finally {
+            if (session != null) try { session.close(); } catch (Exception e) { }
+        }
     }
 }

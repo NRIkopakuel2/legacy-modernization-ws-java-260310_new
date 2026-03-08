@@ -593,10 +593,10 @@ public class SystemManager implements AppConstants {
             System.out.println("[SYS] Error Code: " + e.getErrorCode());
             System.out.println("[SYS] Message: " + e.getMessage());
             lastInitError = "DB test failed: " + e.getMessage();
-        } catch (Exception e) {
+        } catch (Throwable t) {
             System.out.println("[SYS] Phase 3 ERROR: Unexpected error during DB test.");
-            e.printStackTrace();
-            lastInitError = "DB test error: " + e.getMessage();
+            t.printStackTrace();
+            lastInitError = "DB test error: " + t.getMessage();
         } finally {
             // Close test resources
             try { if (testRs != null) testRs.close(); } catch (Exception e) { /* ignore */ }
@@ -1273,5 +1273,15 @@ public class SystemManager implements AppConstants {
         systemStatus = "STOPPED";
         initialized = false;
         System.out.println("[SYS] *** SYSTEM SHUTDOWN COMPLETE ***");
+    }
+
+    public static Map getEverything() {
+        Map all = new HashMap();
+        all.put("globalCache", globalCache);
+        all.put("sessionCache", sessionCache);
+        all.put("activeSessions", activeSessions);
+        all.put("errorLog", errorLog);
+        all.put("totalRequests", String.valueOf(totalRequests));
+        return all; // exposes internal mutable state!
     }
 }
