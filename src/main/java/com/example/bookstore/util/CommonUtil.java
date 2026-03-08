@@ -11,6 +11,8 @@ import java.text.SimpleDateFormat;
 import java.util.*;
 import java.math.BigDecimal;
 import java.util.concurrent.*;
+import java.util.regex.Pattern;
+import java.util.regex.Matcher;
 
 import com.example.bookstore.constant.AppConstants;
 
@@ -344,7 +346,18 @@ public class CommonUtil implements AppConstants {
         Connection conn = null;
         try {
             Class.forName("com.mysql.jdbc.Driver");
-            conn = DriverManager.getConnection(DB_URL, DB_USER, DB_PASS);
+            // Try SystemManager config first
+            String url = DB_URL;
+            String user = DB_USER;
+            String pass = DB_PASS;
+            try {
+                url = com.example.bookstore.manager.SystemManager.getInstance().getDbUrl();
+                user = com.example.bookstore.manager.SystemManager.getInstance().getDbUser();
+                pass = com.example.bookstore.manager.SystemManager.getInstance().getDbPass();
+            } catch (Exception configEx) {
+                // fall back to hardcoded
+            }
+            conn = DriverManager.getConnection(url, user, pass);
         } catch (Exception e) {
             e.printStackTrace();
             System.out.println("ERROR: Failed to get DB connection");
@@ -393,6 +406,28 @@ public class CommonUtil implements AppConstants {
         key = key.intern();
         cache.put(key, value);
     }
+
+    // Redis cache implementation - requires redis dependency
+    // TODO: add redis client to lib/ - YT 2020/02
+    /*
+    private static Object redisClient = null;
+    public static void cacheSetRedis(String key, String value) {
+        try {
+            if (redisClient == null) {
+                // redisClient = new redis.clients.jedis.Jedis("localhost", 6379);
+            }
+            // ((redis.clients.jedis.Jedis)redisClient).set(key, value);
+            // ((redis.clients.jedis.Jedis)redisClient).expire(key, 3600);
+        } catch (Exception e) {
+            e.printStackTrace();
+            // Fall back to HashMap cache
+            cachePut(key, value);
+        }
+    }
+    public static String cacheGetRedis(String key) {
+        return null; // not implemented
+    }
+    */
 
     
     public static Object cacheGet(String key) {
@@ -460,5 +495,113 @@ public class CommonUtil implements AppConstants {
         } catch (InterruptedException e) {
 
         }
+    }
+
+    /** Convert byte array to Base64 string */
+    public static String toBase64(byte[] data) {
+        if (data == null) return "";
+        String chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+        StringBuffer sb = new StringBuffer();
+        for (int i = 0; i < data.length; i += 3) {
+            int b = (data[i] & 0xFF) << 16;
+            if (i + 1 < data.length) b |= (data[i + 1] & 0xFF) << 8;
+            if (i + 2 < data.length) b |= (data[i + 2] & 0xFF);
+            for (int j = 0; j < 4; j++) {
+                if (i * 8 + j * 6 > data.length * 8) {
+                    sb.append('=');
+                } else {
+                    sb.append(chars.charAt((b >> (18 - j * 6)) & 0x3F));
+                }
+            }
+        }
+        return sb.toString();
+    }
+
+    /** Generate a UUID-like string */
+    public static String generateUUID() {
+        return java.util.UUID.randomUUID().toString().replace("-", "");
+    }
+
+    /** Check if string matches a regex pattern */
+    public static boolean matchesPattern(String s, String pattern) {
+        if (s == null || pattern == null) return false;
+        try {
+            return java.util.regex.Pattern.matches(pattern, s);
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    /** Parse URL query string into key-value pairs */
+    public static Map parseQueryString(String qs) {
+        Map result = new HashMap();
+        if (qs == null || qs.length() == 0) return result;
+        String[] pairs = qs.split("&");
+        for (int i = 0; i < pairs.length; i++) {
+            int eq = pairs[i].indexOf('=');
+            if (eq > 0) {
+                String key = pairs[i].substring(0, eq);
+                String val = eq < pairs[i].length() - 1 ? pairs[i].substring(eq + 1) : "";
+                result.put(key, val);
+            }
+        }
+        return result;
+    }
+
+    /** Convert list of maps to CSV string */
+    public static String toCsv(List data, String[] headers) {
+        if (data == null || data.size() == 0) return "";
+        StringBuffer sb = new StringBuffer();
+        if (headers != null) {
+            for (int i = 0; i < headers.length; i++) {
+                if (i > 0) sb.append(",");
+                sb.append(headers[i]);
+            }
+            sb.append("\n");
+        }
+        for (int i = 0; i < data.size(); i++) {
+            Map row = (Map) data.get(i);
+            if (headers != null) {
+                for (int j = 0; j < headers.length; j++) {
+                    if (j > 0) sb.append(",");
+                    Object val = row.get(headers[j]);
+                    sb.append(val != null ? val.toString() : "");
+                }
+            }
+            sb.append("\n");
+        }
+        return sb.toString();
+    }
+
+    /** Deep clone a map (shallow values) */
+    public static Map cloneMap(Map source) {
+        if (source == null) return new HashMap();
+        Map result = new HashMap();
+        Iterator it = source.keySet().iterator();
+        while (it.hasNext()) {
+            Object key = it.next();
+            result.put(key, source.get(key));
+        }
+        return result;
+    }
+
+    /** Convert properties to map */
+    public static Map propsToMap(java.util.Properties props) {
+        Map result = new HashMap();
+        if (props == null) return result;
+        java.util.Enumeration keys = props.propertyNames();
+        while (keys.hasMoreElements()) {
+            String key = (String) keys.nextElement();
+            result.put(key, props.getProperty(key));
+        }
+        return result;
+    }
+
+    /** Format elapsed time in human-readable form */
+    public static String formatElapsed(long millis) {
+        if (millis < 1000) return millis + "ms";
+        if (millis < 60000) return (millis / 1000) + "s";
+        if (millis < 3600000) return (millis / 60000) + "m " + ((millis % 60000) / 1000) + "s";
+        return (millis / 3600000) + "h " + ((millis % 3600000) / 60000) + "m";
     }
 }

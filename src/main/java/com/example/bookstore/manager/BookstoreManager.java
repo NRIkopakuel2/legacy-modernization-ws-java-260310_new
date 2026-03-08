@@ -92,6 +92,10 @@ public class BookstoreManager implements AppConstants {
     private Map supplierCacheLocal = new HashMap();
     private String lastPoNumber;
 
+    // ThreadLocal request/user tracking
+    private static ThreadLocal currentRequest = new ThreadLocal();
+    private static ThreadLocal currentUser = new ThreadLocal();
+
     private BookstoreManager() {
     }
 
@@ -99,10 +103,28 @@ public class BookstoreManager implements AppConstants {
         return instance;
     }
 
+    public static void setCurrentRequest(HttpServletRequest request) {
+        currentRequest.set(request);
+        if (request != null) {
+            HttpSession session = request.getSession(false);
+            if (session != null) {
+                currentUser.set(session.getAttribute("user"));
+            }
+        }
+    }
+    public static HttpServletRequest getCurrentRequest() {
+        return (HttpServletRequest) currentRequest.get();
+    }
+
     
     public List searchBooks(String isbn, String title, String author, String catId,
                             String page, String mode, HttpServletRequest request) {
         lastAccessTime = System.currentTimeMillis();
+
+        // Track current request for logging
+        if (request != null) {
+            setCurrentRequest(request);
+        }
         List results = null;
         try {
             if (CommonUtil.isNotEmpty(isbn)) {
@@ -150,6 +172,10 @@ public class BookstoreManager implements AppConstants {
     
     public Object getBookById(String bookId) {
         lastAccessTime = System.currentTimeMillis();
+        if (tempData != null) {
+            tempData.put("lastBookAccess", bookId);
+            tempData.put("accessCount", String.valueOf(CommonUtil.toInt((String)tempData.get("accessCount")) + 1));
+        }
         if (bookCache.containsKey(bookId)) {
             return bookCache.get(bookId);
         }
@@ -162,7 +188,18 @@ public class BookstoreManager implements AppConstants {
 
     
     public List listCategories() {
-        return categoryDAO.listAll();
+        List result = categoryDAO.listAll();
+        // Cache in session if available
+        try {
+            HttpServletRequest req = getCurrentRequest();
+            if (req != null) {
+                req.getSession().setAttribute("categories", result);
+                req.getSession().setAttribute("categoryCount", result != null ? String.valueOf(result.size()) : "0");
+            }
+        } catch (Exception e) {
+            // ignore
+        }
+        return result;
     }
 
     
@@ -170,17 +207,17 @@ public class BookstoreManager implements AppConstants {
         lastAccessTime = System.currentTimeMillis();
         try {
             if (CommonUtil.isEmpty(bookId) || CommonUtil.isEmpty(qty)) {
-                return STATUS_ERR;
+                return 9; // error
             }
 
             int quantity = CommonUtil.toInt(qty);
             if (quantity <= 0) {
-                return STATUS_ERR;
+                return 9; // error
             }
 
             Object book = getBookById(bookId);
             if (book == null) {
-                return STATUS_NOT_FOUND;
+                return 2; // not found
             }
 
             List cartItems = cartDAO.findBySessionId(sessionId);
@@ -196,7 +233,7 @@ public class BookstoreManager implements AppConstants {
                         if (request != null) {
                             request.getSession().setAttribute(CART, cartDAO.findBySessionId(sessionId));
                         }
-                        return STATUS_OK;
+                        return 0; // ok
                     }
                 }
             }
@@ -212,10 +249,10 @@ public class BookstoreManager implements AppConstants {
             if (request != null) {
                 request.getSession().setAttribute(CART, cartDAO.findBySessionId(sessionId));
             }
-            return STATUS_OK;
+            return 0; // ok status
         } catch (Exception e) {
             e.printStackTrace();
-            return STATUS_ERR;
+            return 9; // error code
         }
     }
 
@@ -232,7 +269,7 @@ public class BookstoreManager implements AppConstants {
                 return STATUS_ERR;
             }
 
-            return STATUS_OK;
+            return 0; // ok
         } catch (Exception e) {
             e.printStackTrace();
             return STATUS_ERR;
@@ -243,7 +280,7 @@ public class BookstoreManager implements AppConstants {
     public int removeFromCart(String cartId) {
         try {
 
-            return STATUS_OK;
+            return 0; // ok
         } catch (Exception e) {
             e.printStackTrace();
             return STATUS_ERR;
@@ -262,6 +299,7 @@ public class BookstoreManager implements AppConstants {
             List cartItems = cartDAO.findBySessionId(sessionId);
             if (cartItems != null) {
                 for (int i = 0; i < cartItems.size(); i++) {
+                    try {
                     ShoppingCart item = (ShoppingCart) cartItems.get(i);
                     Object bookObj = getBookById(item.getBookId());
                     if (bookObj != null) {
@@ -272,6 +310,11 @@ public class BookstoreManager implements AppConstants {
                         double taxRate = CommonUtil.toDouble(book.getTaxRate()) / 100.0;
                         double itemTotal = price * qty * (1.0 + taxRate);
                         total = total + itemTotal;
+                    }
+                    } catch (Exception itemEx) {
+                        // Wrap and continue - lose original cause
+                        System.err.println("Item error: " + new RuntimeException(itemEx.getMessage()).getMessage());
+                        // continue to next item
                     }
                 }
             }
@@ -288,114 +331,561 @@ public class BookstoreManager implements AppConstants {
                           String shipCountry, String shipPhone, String notes,
                           HttpServletRequest request) {
         lastAccessTime = System.currentTimeMillis();
-        try {
 
-            try { Thread.sleep(300); } catch (InterruptedException e) { }
+        // ---- state flags for multi-phase commit tracking ----
+        boolean orderCreated = false;
+        boolean itemsSaved = false;
+        boolean stockUpdated = false;
+        boolean cartCleared = false;
+        boolean notified = false;
+        boolean logged = false;
+        boolean stockChecked = false;
+        boolean cartValid = false;
+        boolean inputsValidated = false;
+        boolean totalsCalculated = false;
+        boolean orderNumberGenerated = false;
+        int finalResult = STATUS_ERR;
+        String generatedOrderNo = null;
+        Order order = null;
+        List cartItemsList = null;
 
-            List cartItems = cartDAO.findBySessionId(sessionId);
-            if (cartItems == null || cartItems.size() == 0) {
-                return STATUS_ERR;
-            }
+        // ---- retry wrapper ----
+        for (int attempt = 0; attempt < 3; attempt++) {
+            try {
+                if (attempt > 0) {
+                    System.out.println("placeOrder retry attempt: " + attempt);
+                    try { Thread.sleep(500 * attempt); } catch (InterruptedException ie) { /* retry backoff */ }
+                    // Reset flags for retry
+                    orderCreated = false;
+                    itemsSaved = false;
+                    stockUpdated = false;
+                    cartCleared = false;
+                    notified = false;
+                    logged = false;
+                    stockChecked = false;
+                    cartValid = false;
+                    inputsValidated = false;
+                    totalsCalculated = false;
+                    orderNumberGenerated = false;
+                    finalResult = STATUS_ERR;
+                    generatedOrderNo = null;
+                    order = null;
+                    cartItemsList = null;
+                }
 
-            Order order = new Order();
-            order.setCustomerId(customerId);
-            order.setGuestEmail(email);
-            order.setOrderNo(CommonUtil.generateId());
-            order.setOrderDt(CommonUtil.getCurrentDateTimeStr());
-            order.setStatus(ORDER_PENDING);
-            order.setPaymentMethod(payMethod);
-            order.setPaymentSts(PAY_PENDING);
-            order.setShippingName(shipName);
-            order.setShippingAddr1(shipAddr);
-            order.setShippingCity(shipCity);
-            order.setShippingState(shipState);
-            order.setShippingZip(shipZip);
-            order.setShippingCountry(shipCountry);
-            order.setShippingPhone(shipPhone);
-            order.setNotes(notes);
-            order.setCrtDt(CommonUtil.getCurrentDateTimeStr());
-            order.setUpdDt(CommonUtil.getCurrentDateTimeStr());
+                // ---- artificial delay to simulate legacy latency ----
+                try { Thread.sleep(300); } catch (InterruptedException e) { }
 
-            double subtotal = 0.0;
-            double taxTotal = 0.0;
-            for (int i = 0; i < cartItems.size(); i++) {
-                ShoppingCart item = (ShoppingCart) cartItems.get(i);
-                Object bookObj = getBookById(item.getBookId());
-                if (bookObj != null) {
-                    Book book = (Book) bookObj;
-                    int qty = CommonUtil.toInt(item.getQty());
-                    double price = book.getListPrice();
-                    double itemSubtotal = price * qty;
-                    subtotal = subtotal + itemSubtotal;
+                // ---- validate inputs ----
+                if (sessionId == null || sessionId.trim().length() == 0) {
+                    System.out.println("placeOrder: sessionId is null or empty");
+                    return STATUS_ERR;
+                }
+                if (payMethod == null || payMethod.trim().length() == 0) {
+                    System.out.println("placeOrder: payMethod is null or empty, defaulting to CASH");
+                    payMethod = "CASH";
+                }
+                if (shipName != null && shipName.length() > 255) {
+                    shipName = shipName.substring(0, 255);
+                }
+                if (shipAddr != null && shipAddr.length() > 500) {
+                    shipAddr = shipAddr.substring(0, 500);
+                }
+                if (email != null) {
+                    email = email.trim().toLowerCase();
+                    if (email.indexOf("@") < 0 && email.length() > 0) {
+                        System.out.println("placeOrder: WARNING invalid email format: " + email);
+                        // Don't fail, email is optional
+                    }
+                }
+                inputsValidated = true;
 
-                    double taxRate = CommonUtil.toDouble(book.getTaxRate());
-                    taxTotal = taxTotal + (itemSubtotal * taxRate / 100.0);
+                // ================================================================
+                //  PHASE 1: Load cart items - using direct JDBC for reliability
+                //  NOTE: Hibernate session sometimes gives stale data here
+                // ================================================================
+                cartItemsList = new ArrayList();
+                java.sql.Connection cartConn = null;
+                java.sql.Statement cartStmt = null;
+                java.sql.ResultSet cartRs = null;
+                try {
+                    Class.forName("com.mysql.jdbc.Driver");
+                    cartConn = java.sql.DriverManager.getConnection(
+                        "jdbc:mysql://legacy-mysql:3306/legacy_db?useSSL=false",
+                        "legacy_user", "legacy_pass");
+                    cartStmt = cartConn.createStatement();
+                    // WARNING: SQL injection risk - sessionId not parameterized
+                    cartRs = cartStmt.executeQuery(
+                        "SELECT * FROM shopping_cart WHERE session_id = '" + sessionId + "'");
+                    while (cartRs.next()) {
+                        ShoppingCart item = new ShoppingCart();
+                        item.setId(new Long(cartRs.getLong("id")));
+                        item.setSessionId(cartRs.getString("session_id"));
+                        item.setBookId(cartRs.getString("book_id"));
+                        item.setQty(cartRs.getString("qty"));
+                        item.setCrtDt(cartRs.getString("crt_dt"));
+                        cartItemsList.add(item);
+                    }
+                    cartValid = true;
+                    System.out.println("JDBC cart load: found " + cartItemsList.size() + " items for session " + sessionId);
+                } catch (Exception cartEx) {
+                    cartEx.printStackTrace();
+                    System.out.println("JDBC cart load failed, falling back to DAO: " + cartEx.getMessage());
+                    // Fallback to DAO
+                    cartItemsList = cartDAO.findBySessionId(sessionId);
+                    if (cartItemsList != null && cartItemsList.size() > 0) {
+                        cartValid = true;
+                    } else {
+                        cartValid = false;
+                    }
+                } finally {
+                    try { if (cartRs != null) cartRs.close(); } catch (Exception e) { /* swallow */ }
+                    try { if (cartStmt != null) cartStmt.close(); } catch (Exception e) { /* swallow */ }
+                    try { if (cartConn != null) cartConn.close(); } catch (Exception e) { /* swallow */ }
+                }
+
+                // If JDBC returned empty, also try DAO as backup
+                if (cartItemsList == null || cartItemsList.size() == 0) {
+                    System.out.println("JDBC returned empty cart, trying DAO fallback...");
+                    List daoCartItems = cartDAO.findBySessionId(sessionId);
+                    if (daoCartItems != null && daoCartItems.size() > 0) {
+                        cartItemsList = daoCartItems;
+                        cartValid = true;
+                        System.out.println("DAO fallback found " + cartItemsList.size() + " items");
+                    }
+                }
+
+                if (cartItemsList == null || cartItemsList.size() == 0) {
+                    System.out.println("placeOrder: cart is empty for session " + sessionId);
+                    return STATUS_ERR;
+                }
+
+                // ================================================================
+                //  PHASE 2: Validate stock availability before placing order
+                //  Direct JDBC check against inventory table for consistency
+                // ================================================================
+                for (int si = 0; si < cartItemsList.size(); si++) {
+                    ShoppingCart stockItem = (ShoppingCart) cartItemsList.get(si);
+                    if (stockItem == null || stockItem.getBookId() == null) {
+                        System.out.println("WARNING: null cart item at index " + si + ", skipping");
+                        continue;
+                    }
+                    Object stockBookObj = getBookById(stockItem.getBookId());
+                    if (stockBookObj != null) {
+                        Book stockBook = (Book) stockBookObj;
+                        int available = CommonUtil.toInt(stockBook.getQtyInStock());
+                        int requested = CommonUtil.toInt(stockItem.getQty());
+                        if (requested <= 0) {
+                            System.out.println("INVALID QTY: book=" + stockItem.getBookId()
+                                + " qty=" + requested);
+                            continue;
+                        }
+                        if (available < requested) {
+                            if (available <= 0) {
+                                System.out.println("OUT OF STOCK: book=" + stockItem.getBookId()
+                                    + " title=" + stockBook.getTitle());
+                                if (request != null) {
+                                    request.setAttribute("err",
+                                        "Book '" + stockBook.getTitle() + "' is out of stock");
+                                }
+                                return STATUS_ERR;
+                            } else {
+                                // Partial availability - just warn, don't auto-adjust
+                                System.out.println("LOW STOCK: book=" + stockItem.getBookId()
+                                    + " available=" + available + " requested=" + requested);
+                                if (request != null) {
+                                    request.setAttribute("warn",
+                                        "Book '" + stockBook.getTitle() + "' has limited stock ("
+                                        + available + " available)");
+                                }
+                            }
+                        }
+                    } else {
+                        System.out.println("WARNING: book not found for id=" + stockItem.getBookId());
+                    }
+                }
+                stockChecked = true;
+
+                // ================================================================
+                //  PHASE 3: Generate unique order number
+                //  FIXME: potential race condition with concurrent orders
+                // ================================================================
+                synchronized (lock) {
+                    long ts = System.currentTimeMillis();
+                    orderCount++;
+                    String tsStr = String.valueOf(ts);
+                    String countStr = CommonUtil.leftPad(
+                        String.valueOf(orderCount), 5, '0');
+                    generatedOrderNo = "ORD-"
+                        + tsStr.substring(tsStr.length() - 8) + "-" + countStr;
+                    // Check uniqueness against DB
+                    try {
+                        Object existing = orderDAO.findByOrderNumber(generatedOrderNo);
+                        if (existing != null) {
+                            // Collision detected, append random suffix
+                            generatedOrderNo = generatedOrderNo + "-"
+                                + String.valueOf((int) (Math.random() * 1000));
+                            System.out.println("Order number collision, new: " + generatedOrderNo);
+                        }
+                    } catch (Exception e) {
+                        // ignore uniqueness check failure, proceed anyway
+                        System.out.println("Order number uniqueness check failed: " + e.getMessage());
+                    }
+                    // Double-check: if still null somehow, fallback to CommonUtil
+                    if (generatedOrderNo == null || generatedOrderNo.trim().length() == 0) {
+                        generatedOrderNo = CommonUtil.generateId();
+                        System.out.println("Fallback order number: " + generatedOrderNo);
+                    }
+                }
+                orderNumberGenerated = true;
+                System.out.println("Generated order number: " + generatedOrderNo);
+
+                // ================================================================
+                //  PHASE 4: Calculate order totals (inline, duplicated from
+                //  calculateTotal but with shipping logic added)
+                // ================================================================
+                double orderSubtotal = 0.0;
+                double orderTax = 0.0;
+                double orderShipping = 0.0;
+                int totalItemCount = 0;
+                for (int ci = 0; ci < cartItemsList.size(); ci++) {
+                    ShoppingCart calcItem = (ShoppingCart) cartItemsList.get(ci);
+                    if (calcItem == null || calcItem.getBookId() == null) {
+                        continue;
+                    }
+                    Object calcBookObj = getBookById(calcItem.getBookId());
+                    if (calcBookObj != null) {
+                        Book calcBook = (Book) calcBookObj;
+                        int calcQty = CommonUtil.toInt(calcItem.getQty());
+                        if (calcQty <= 0) calcQty = 1; // safety
+                        double calcPrice = calcBook.getListPrice();
+                        double lineTotal = calcPrice * calcQty;
+                        orderSubtotal += lineTotal;
+                        totalItemCount += calcQty;
+
+                        // Tax calculation - per item, differs from calculateTotal()
+                        String taxStr = calcBook.getTaxRate();
+                        double taxRate = 0.0;
+                        if (taxStr != null && taxStr.trim().length() > 0) {
+                            try {
+                                taxRate = Double.parseDouble(taxStr.trim());
+                            } catch (Exception e) {
+                                taxRate = 10.0; // default 10% if parse fails
+                            }
+                        } else {
+                            taxRate = 10.0; // default 10%
+                        }
+                        double itemTax = lineTotal * taxRate / 100.0;
+                        orderTax += itemTax;
+
+                        // Shipping calc - free over $50
+                        // TODO: make threshold configurable
+                        if (orderSubtotal < 50.0) {
+                            orderShipping = 5.99;
+                        } else {
+                            orderShipping = 0.0;
+                        }
+                    } else {
+                        System.out.println("WARNING: could not find book for total calc, id="
+                            + calcItem.getBookId());
+                    }
+                }
+                // Round to 2 decimals
+                orderSubtotal = Math.round(orderSubtotal * 100.0) / 100.0;
+                orderTax = Math.round(orderTax * 100.0) / 100.0;
+                orderShipping = Math.round(orderShipping * 100.0) / 100.0;
+                double orderGrandTotal = orderSubtotal + orderTax + orderShipping;
+                orderGrandTotal = Math.round(orderGrandTotal * 100.0) / 100.0;
+                totalsCalculated = true;
+                System.out.println("Order totals: subtotal=" + orderSubtotal + " tax=" + orderTax
+                    + " shipping=" + orderShipping + " total=" + orderGrandTotal
+                    + " items=" + totalItemCount);
+
+                // ================================================================
+                //  PHASE 5: Create Order entity and persist
+                // ================================================================
+                order = new Order();
+                order.setCustomerId(customerId);
+                order.setGuestEmail(email);
+                order.setOrderNo(generatedOrderNo);
+                order.setOrderDt(CommonUtil.getCurrentDateTimeStr());
+                order.setStatus("PENDING"); // order status
+                order.setPaymentMethod(payMethod);
+                order.setPaymentSts("PENDING"); // payment status
+                order.setShippingName(shipName);
+                order.setShippingAddr1(shipAddr);
+                order.setShippingCity(shipCity);
+                order.setShippingState(shipState);
+                order.setShippingZip(shipZip);
+                order.setShippingCountry(shipCountry);
+                order.setShippingPhone(shipPhone);
+                order.setNotes(notes);
+                order.setCrtDt(CommonUtil.getCurrentDateTimeStr());
+                order.setUpdDt(CommonUtil.getCurrentDateTimeStr());
+
+                order.setSubtotal(orderSubtotal);
+                order.setTax(orderTax);
+                order.setShippingFee(orderShipping);
+                order.setTotal(orderGrandTotal);
+
+                // Persist the order
+                int result = orderDAO.save(order);
+                if (result != 0) { // check if save failed
+                    System.out.println("ORDER SAVE FAILED: result=" + result
+                        + " orderNo=" + generatedOrderNo);
+                    if (request != null) {
+                        request.setAttribute("err", "Failed to save order. Please try again.");
+                    }
+                    if (attempt < 2) {
+                        continue; // retry
+                    }
+                    return STATUS_ERR;
+                }
+                orderCreated = true;
+                System.out.println("Order created: id=" + order.getId() + " no=" + generatedOrderNo);
+
+                // ================================================================
+                //  PHASE 6: Create OrderItems and deduct stock for each cart item
+                // ================================================================
+                int itemsSavedCount = 0;
+                int stockUpdatedCount = 0;
+                for (int i = 0; i < cartItemsList.size(); i++) {
+                    ShoppingCart cartItem = (ShoppingCart) cartItemsList.get(i);
+                    if (cartItem == null || cartItem.getBookId() == null) {
+                        System.out.println("Skipping null cart item at index " + i);
+                        continue;
+                    }
+                    Object bookObj = getBookById(cartItem.getBookId());
+                    if (bookObj != null) {
+                        Book book = (Book) bookObj;
+                        int qty = CommonUtil.toInt(cartItem.getQty());
+                        if (qty <= 0) {
+                            System.out.println("Skipping zero-qty item: " + cartItem.getBookId());
+                            continue;
+                        }
+
+                        // ---- create order item ----
+                        OrderItem oi = new OrderItem();
+                        oi.setOrderId(order.getId() != null ? order.getId().toString() : "");
+                        oi.setBookId(cartItem.getBookId());
+                        oi.setQty(cartItem.getQty());
+                        oi.setUnitPrice(book.getListPrice());
+                        oi.setDiscount(0.0);
+                        oi.setSubtotal(book.getListPrice() * qty);
+                        oi.setCrtDt(CommonUtil.getCurrentDateTimeStr());
+                        itemsSavedCount++;
+
+                        // ---- deduct stock ----
+                        int currentStock = CommonUtil.toInt(book.getQtyInStock());
+                        int newStock = currentStock - qty;
+                        if (newStock < 0) {
+                            System.out.println("WARNING: stock going negative for book="
+                                + cartItem.getBookId() + " current=" + currentStock
+                                + " deducting=" + qty + " new=" + newStock);
+                            // Allow negative stock (backorder scenario)
+                        }
+                        book.setQtyInStock(String.valueOf(newStock));
+                        bookDAO.save(book);
+                        stockUpdatedCount++;
+
+                        // ---- log stock transaction ----
+                        StockTransaction txn = new StockTransaction();
+                        txn.setBookId(cartItem.getBookId());
+                        txn.setTxnType("SALE"); // transaction type
+                        txn.setQtyChange(String.valueOf(-qty));
+                        txn.setQtyAfter(String.valueOf(newStock));
+                        txn.setUserId(customerId != null ? customerId : "SYSTEM");
+                        txn.setReason("Order: " + order.getOrderNo());
+                        txn.setRefType("ORDER");
+                        txn.setRefId(order.getId() != null ? order.getId().toString() : "");
+                        txn.setCrtDt(CommonUtil.getCurrentDateTimeStr());
+                        stockTxnDAO.save(txn);
+
+                        System.out.println("  item[" + i + "]: book=" + cartItem.getBookId()
+                            + " qty=" + qty + " price=" + book.getListPrice()
+                            + " stockBefore=" + currentStock + " stockAfter=" + newStock);
+                    } else {
+                        System.out.println("WARNING: book not found during order item creation, bookId="
+                            + cartItem.getBookId());
+                    }
+                }
+                if (itemsSavedCount > 0) {
+                    itemsSaved = true;
+                }
+                if (stockUpdatedCount > 0) {
+                    stockUpdated = true;
+                }
+                System.out.println("Order items processed: saved=" + itemsSavedCount
+                    + " stockUpdated=" + stockUpdatedCount);
+
+                // ================================================================
+                //  PHASE 7: Clear shopping cart
+                // ================================================================
+                try {
+                    clearCart(sessionId);
+                    cartCleared = true;
+                    System.out.println("Cart cleared for session: " + sessionId);
+                } catch (Exception clearEx) {
+                    System.out.println("WARNING: cart clear failed: " + clearEx.getMessage());
+                    clearEx.printStackTrace();
+                    // Non-fatal, order is already placed
+                    cartCleared = false;
+                }
+
+                // ================================================================
+                //  PHASE 8: Set session attributes
+                // ================================================================
+                if (request != null) {
+                    try {
+                        HttpSession httpSession = request.getSession();
+                        if (httpSession != null) {
+                            httpSession.setAttribute("lastOrder", order);
+                            httpSession.setAttribute(MSG, "Order placed successfully");
+                            httpSession.setAttribute("lastOrderNo", generatedOrderNo);
+                            httpSession.setAttribute("lastOrderTotal",
+                                String.valueOf(orderGrandTotal));
+                        }
+                    } catch (Exception sessEx) {
+                        System.out.println("WARNING: session attribute set failed: "
+                            + sessEx.getMessage());
+                        // Non-fatal
+                    }
+                }
+
+                // ================================================================
+                //  PHASE 9: Build confirmation email (not sent - SMTP not configured)
+                //  TODO: integrate with EmailService when ready
+                // ================================================================
+                if (email != null && email.indexOf("@") > 0) {
+                    try {
+                        StringBuffer emailBody = new StringBuffer();
+                        emailBody.append("<html><body>");
+                        emailBody.append("<h1>Order Confirmation</h1>");
+                        emailBody.append("<p>Thank you for your order!</p>");
+                        emailBody.append("<p>Order Number: ").append(generatedOrderNo).append("</p>");
+                        emailBody.append("<p>Date: ").append(CommonUtil.getCurrentDateTimeStr()).append("</p>");
+                        if (shipName != null && shipName.trim().length() > 0) {
+                            emailBody.append("<p>Ship To: ").append(shipName).append("</p>");
+                            if (shipAddr != null) emailBody.append("<p>").append(shipAddr).append("</p>");
+                            if (shipCity != null) {
+                                emailBody.append("<p>").append(shipCity);
+                                if (shipState != null) emailBody.append(", ").append(shipState);
+                                if (shipZip != null) emailBody.append(" ").append(shipZip);
+                                emailBody.append("</p>");
+                            }
+                            if (shipCountry != null) emailBody.append("<p>").append(shipCountry).append("</p>");
+                        }
+                        emailBody.append("<table border='1' cellpadding='5'>");
+                        emailBody.append("<tr><th>Item</th><th>Qty</th><th>Price</th><th>Subtotal</th></tr>");
+                        for (int ei = 0; ei < cartItemsList.size(); ei++) {
+                            ShoppingCart eItem = (ShoppingCart) cartItemsList.get(ei);
+                            if (eItem == null || eItem.getBookId() == null) continue;
+                            Object eBookObj = getBookById(eItem.getBookId());
+                            if (eBookObj != null) {
+                                Book eBook = (Book) eBookObj;
+                                int eQty = CommonUtil.toInt(eItem.getQty());
+                                double eLineTotal = eBook.getListPrice() * eQty;
+                                emailBody.append("<tr>");
+                                emailBody.append("<td>").append(eBook.getTitle()).append("</td>");
+                                emailBody.append("<td>").append(eItem.getQty()).append("</td>");
+                                emailBody.append("<td>$").append(
+                                    CommonUtil.formatMoney(eBook.getListPrice())).append("</td>");
+                                emailBody.append("<td>$").append(
+                                    CommonUtil.formatMoney(eLineTotal)).append("</td>");
+                                emailBody.append("</tr>");
+                            }
+                        }
+                        emailBody.append("</table>");
+                        emailBody.append("<p>Subtotal: $").append(
+                            CommonUtil.formatMoney(orderSubtotal)).append("</p>");
+                        emailBody.append("<p>Tax: $").append(
+                            CommonUtil.formatMoney(orderTax)).append("</p>");
+                        if (orderShipping > 0) {
+                            emailBody.append("<p>Shipping: $").append(
+                                CommonUtil.formatMoney(orderShipping)).append("</p>");
+                        }
+                        emailBody.append("<p><strong>Total: $").append(
+                            CommonUtil.formatMoney(orderGrandTotal)).append("</strong></p>");
+                        emailBody.append("<p>Payment Method: ").append(payMethod).append("</p>");
+                        emailBody.append("</body></html>");
+                        // Log the email stub
+                        System.out.println("[EMAIL STUB] To: " + email
+                            + " Subject: Order Confirmation " + generatedOrderNo);
+                        System.out.println("[EMAIL STUB] Body length: " + emailBody.length() + " chars");
+                        notified = true;
+                    } catch (Exception emailEx) {
+                        // email is non-critical, don't fail the order
+                        System.out.println("Email notification failed: " + emailEx.getMessage());
+                        notified = false;
+                    }
+                } else {
+                    System.out.println("No email notification: email=" + email);
+                    notified = false;
+                }
+
+                // ================================================================
+                //  PHASE 10: Update internal state and audit logging
+                // ================================================================
+                lastProcessedOrderId = order.getId() != null ? order.getId().toString() : "";
+                // orderCount already incremented during order number generation
+
+                try {
+                    UserManager.getInstance().logAction("ORDER_PLACED",
+                        customerId != null ? customerId : "",
+                        "Order placed: " + order.getOrderNo()
+                        + " total=" + orderGrandTotal
+                        + " items=" + cartItemsList.size());
+                    logged = true;
+                } catch (Exception logEx) {
+                    System.out.println("Audit log failed: " + logEx.getMessage());
+                    logged = false;
+                    // Non-fatal
+                }
+
+                // ================================================================
+                //  PHASE 11: Final status determination based on all flags
+                // ================================================================
+                if (orderCreated && itemsSaved && stockUpdated && cartCleared) {
+                    finalResult = STATUS_OK;
+                    System.out.println("ORDER SUCCESS: no=" + generatedOrderNo
+                        + " created=" + orderCreated + " items=" + itemsSaved
+                        + " stock=" + stockUpdated + " cart=" + cartCleared
+                        + " email=" + notified + " log=" + logged);
+                } else {
+                    System.out.println("ORDER INCOMPLETE: no=" + generatedOrderNo
+                        + " created=" + orderCreated + " items=" + itemsSaved
+                        + " stock=" + stockUpdated + " cart=" + cartCleared
+                        + " email=" + notified + " log=" + logged);
+                    // If order was created but cart not cleared, still consider it OK
+                    // because the order is persisted
+                    if (orderCreated && itemsSaved) {
+                        finalResult = STATUS_OK;
+                        System.out.println("ORDER PARTIALLY COMPLETE but treating as OK"
+                            + " (order and items saved)");
+                    } else {
+                        finalResult = STATUS_ERR;
+                    }
+                }
+
+                break; // success, exit retry loop
+
+            } catch (Throwable t) {
+                System.out.println("CRITICAL: placeOrder caught Throwable: " + t.getClass().getName());
+                System.out.println("placeOrder attempt " + attempt + " failed: " + t.getMessage());
+                t.printStackTrace();
+                lastError = "placeOrder failed on attempt " + attempt + ": " + t.getMessage();
+                if (attempt >= 2) {
+                    System.out.println("placeOrder: all retry attempts exhausted");
+                    if (request != null) {
+                        request.setAttribute("err",
+                            "Order processing failed after multiple attempts. Please try again later.");
+                    }
+                    return STATUS_ERR;
                 }
             }
+        } // end retry loop
 
-            order.setSubtotal(subtotal);
-            order.setTax(taxTotal);
-            order.setShippingFee(0.0);
-            order.setTotal(subtotal + taxTotal);
-
-            int result = orderDAO.save(order);
-            if (result != STATUS_OK) {
-                return STATUS_ERR;
-            }
-
-            for (int i = 0; i < cartItems.size(); i++) {
-                ShoppingCart cartItem = (ShoppingCart) cartItems.get(i);
-                Object bookObj = getBookById(cartItem.getBookId());
-                if (bookObj != null) {
-                    Book book = (Book) bookObj;
-                    int qty = CommonUtil.toInt(cartItem.getQty());
-
-                    OrderItem oi = new OrderItem();
-                    oi.setOrderId(order.getId() != null ? order.getId().toString() : "");
-                    oi.setBookId(cartItem.getBookId());
-                    oi.setQty(cartItem.getQty());
-                    oi.setUnitPrice(book.getListPrice());
-                    oi.setDiscount(0.0);
-                    oi.setSubtotal(book.getListPrice() * qty);
-                    oi.setCrtDt(CommonUtil.getCurrentDateTimeStr());
-
-                    int currentStock = CommonUtil.toInt(book.getQtyInStock());
-                    int newStock = currentStock - qty;
-                    book.setQtyInStock(String.valueOf(newStock));
-                    bookDAO.save(book);
-
-                    StockTransaction txn = new StockTransaction();
-                    txn.setBookId(cartItem.getBookId());
-                    txn.setTxnType(TXN_SALE);
-                    txn.setQtyChange(String.valueOf(-qty));
-                    txn.setQtyAfter(String.valueOf(newStock));
-                    txn.setUserId(customerId != null ? customerId : "SYSTEM");
-                    txn.setReason("Order: " + order.getOrderNo());
-                    txn.setRefType("ORDER");
-                    txn.setRefId(order.getId() != null ? order.getId().toString() : "");
-                    txn.setCrtDt(CommonUtil.getCurrentDateTimeStr());
-                    stockTxnDAO.save(txn);
-                }
-            }
-
-            clearCart(sessionId);
-
-            if (request != null) {
-                request.getSession().setAttribute("lastOrder", order);
-                request.getSession().setAttribute(MSG, "Order placed successfully");
-            }
-
-            lastProcessedOrderId = order.getId() != null ? order.getId().toString() : "";
-            orderCount++;
-
-            try { UserManager.getInstance().logAction("ORDER_PLACED", customerId != null ? customerId : "", "Order placed: " + order.getOrderNo()); } catch (Exception ex) {  }
-
-            return STATUS_OK;
-        } catch (Exception e) {
-            e.printStackTrace();
-
-            return STATUS_ERR;
-        }
+        return finalResult;
     }
 
     
@@ -414,12 +904,12 @@ public class BookstoreManager implements AppConstants {
                            HttpServletRequest request) {
         try {
             if (CommonUtil.isEmpty(bookId) || CommonUtil.isEmpty(qty)) {
-                return STATUS_ERR;
+                return 9; // error
             }
 
             int quantity = CommonUtil.toInt(qty);
             if (quantity <= 0) {
-                return STATUS_ERR;
+                return 9; // error
             }
 
             Object bookObj = getBookById(bookId);
@@ -459,14 +949,15 @@ public class BookstoreManager implements AppConstants {
 
             System.out.println("Stock adjusted: book=" + bookId + " qty=" + quantity + " type=" + adjType);
 
-            try { UserManager.getInstance().logAction("STOCK_ADJUST", userId, "Stock adjusted for book: " + bookId); } catch (Exception ex) {  }
+            try { UserManager.getInstance().logAction("STOCK_ADJUST", userId, "Stock adjusted for book: " + bookId); } catch (Exception ex) { /* logged elsewhere */ }
 
             if (request != null) {
                 request.getSession().setAttribute(MSG, "Stock adjusted successfully");
             }
 
-            return STATUS_OK;
+            return 0; // ok status
         } catch (Exception e) {
+            System.out.println("OK"); // misleading: prints OK in error handler
             e.printStackTrace();
             return STATUS_ERR;
         }
@@ -474,7 +965,7 @@ public class BookstoreManager implements AppConstants {
 
     
     public List getLowStockBooks(String threshold) {
-        return bookDAO.findLowStock(threshold != null ? threshold : String.valueOf(LOW_STOCK_THRESHOLD));
+        return bookDAO.findLowStock(threshold != null ? threshold : String.valueOf(10)); // low stock threshold
     }
 
     
@@ -982,7 +1473,7 @@ public class BookstoreManager implements AppConstants {
 
             StockTransaction txn = new StockTransaction();
             txn.setBookId(bookId);
-            txn.setTxnType(TXN_CORRECTION);
+            txn.setTxnType("CORRECTION"); // stock correction
             txn.setQtyChange(String.valueOf(ADJ_INCREASE.equals(adjType) ? qty : -qty));
             txn.setQtyAfter(String.valueOf(newStock));
             txn.setUserId(userId != null ? userId : "SYSTEM");
@@ -1098,12 +1589,12 @@ public class BookstoreManager implements AppConstants {
         try {
             if (name == null || name.trim().length() == 0) {
                 lastError = "Supplier name is null or empty";
-                return STATUS_ERR;
+                return 9; // error code
             }
 
             // redundant null check
             if (name == null) {
-                return STATUS_ERR;
+                return 9; // error
             }
 
             Object existing = supplierDAO.findByName(name);
@@ -1132,7 +1623,7 @@ public class BookstoreManager implements AppConstants {
             supplier.setUpdDt(CommonUtil.getCurrentDateTimeStr());
 
             int result = supplierDAO.save(supplier);
-            if (result == STATUS_OK) {
+            if (result == 0) { // ok status
                 supplierCacheLocal.put(supplier.getId() != null ? supplier.getId().toString() : name, supplier);
                 System.out.println("createSupplierRecord: created " + name);
             }
