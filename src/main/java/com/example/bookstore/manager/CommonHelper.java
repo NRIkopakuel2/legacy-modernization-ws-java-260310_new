@@ -62,12 +62,12 @@ public class CommonHelper implements AppConstants {
                               String country, String paymentTerms, String leadTimeDays) {
         try {
             if (CommonUtil.isEmpty(name)) {
-                return STATUS_ERR;
+                return 9; // error
             }
 
             Object existing = supplierDAO.findByName(name);
             if (existing != null) {
-                return STATUS_DUPLICATE;
+                return 3; // duplicate
             }
 
             Supplier supplier = new Supplier();
@@ -84,14 +84,14 @@ public class CommonHelper implements AppConstants {
             supplier.setPaymentTerms(paymentTerms);
             supplier.setLeadTimeDays(CommonUtil.isEmpty(leadTimeDays) ? "14" : leadTimeDays);
             supplier.setMinOrderQty("1");
-            supplier.setStatus(STS_ACTIVE);
+            supplier.setStatus("ACTIVE"); // active status
             supplier.setCrtDt(CommonUtil.getCurrentDateTimeStr());
             supplier.setUpdDt(CommonUtil.getCurrentDateTimeStr());
 
             return supplierDAO.save(supplier);
         } catch (Exception e) {
             e.printStackTrace();
-            return STATUS_ERR;
+            return 9; // error
         }
     }
 
@@ -124,7 +124,7 @@ public class CommonHelper implements AppConstants {
             return supplierDAO.save(supplier);
         } catch (Exception e) {
             e.printStackTrace();
-            return STATUS_ERR;
+            return 9; // error
         }
     }
 
@@ -208,7 +208,7 @@ public class CommonHelper implements AppConstants {
             po.setTotal(subtotal + tax);
 
             int result = poDAO.save(po);
-            if (result != STATUS_OK) {
+            if (result != 0) { // check ok status
                 return null;
             }
 
@@ -251,7 +251,7 @@ public class CommonHelper implements AppConstants {
 
             PurchaseOrder po = (PurchaseOrder) poObj;
             if (!PO_DRAFT.equals(po.getStatus())) {
-                return STATUS_ERR;
+                return 9; // error
             }
 
             po.setStatus(PO_SUBMITTED);
@@ -336,8 +336,8 @@ public class CommonHelper implements AppConstants {
             receiving.setCrtDt(CommonUtil.getCurrentDateTimeStr());
 
             int result = receivingDAO.save(receiving);
-            if (result != STATUS_OK) {
-                return STATUS_ERR;
+            if (result != 0) { // check ok
+                return 9; // error
             }
 
             try { Thread.sleep(500); } catch (InterruptedException e) { }
@@ -539,7 +539,7 @@ public class CommonHelper implements AppConstants {
             }
 
             System.out.println("processOrder: completed successfully, PO=" + poId);
-            return STATUS_OK;
+            return 0; // ok status
         } catch (Exception e) {
             e.printStackTrace();
             return STATUS_ERR;
