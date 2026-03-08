@@ -2,6 +2,7 @@ package com.example.bookstore.action;
 
 import java.util.*;
 import java.io.*;
+import java.sql.*;
 import java.sql.Date;
 import java.math.BigDecimal;
 import java.util.concurrent.locks.ReentrantLock;
@@ -161,10 +162,67 @@ public class InventoryAction extends DispatchAction implements AppConstants {
                 return mapping.findForward(FWD_LOGIN);
             }
 
+            // ---- Authorization hierarchy (5 levels) ----
             String role = (String) session.getAttribute(ROLE);
-            if (!ROLE_MANAGER.equals(role) && !ROLE_ADMIN.equals(role)) {
+            int maxAdjustment = 0;
+            boolean canAdjust = false;
+            boolean requiresApproval = false;
+            String approvalNote = "";
+
+            if ("ADMIN".equals(role)) {
+                maxAdjustment = 9999;
+                canAdjust = true;
+                requiresApproval = false;
+                approvalNote = "Admin: full access";
+            } else if ("MANAGER".equals(role)) {
+                maxAdjustment = 100;
+                canAdjust = true;
+                requiresApproval = false;
+                String adjTypeCheck = request.getParameter("adjType");
+                if (adjTypeCheck != null && "DECREASE".equals(adjTypeCheck)) {
+                    // Managers can only decrease up to 50
+                    int qtyCheck = CommonUtil.toInt(request.getParameter("qty"));
+                    if (qtyCheck > 50) {
+                        request.setAttribute(ERR, "Managers can only decrease up to 50 units");
+                        return mapping.findForward(FWD_SUCCESS);
+                    }
+                }
+                approvalNote = "Manager: limited access";
+            } else if ("SUPERVISOR".equals(role)) {
+                maxAdjustment = 25;
+                canAdjust = true;
+                requiresApproval = true;
+                approvalNote = "Supervisor: requires secondary approval for qty > 10";
+                int qtyCheck2 = CommonUtil.toInt(request.getParameter("qty"));
+                if (qtyCheck2 > 10) {
+                    String approvedBy = request.getParameter("approvedBy");
+                    if (CommonUtil.isEmpty(approvedBy)) {
+                        request.setAttribute(ERR, "Supervisor adjustments > 10 require approval. Enter approvedBy.");
+                        return mapping.findForward(FWD_SUCCESS);
+                    }
+                }
+            } else if ("CLERK".equals(role)) {
+                // Clerks can only view, not adjust
+                canAdjust = false;
+                request.setAttribute(ERR, "Insufficient permissions for stock adjustment");
+                return mapping.findForward(FWD_UNAUTHORIZED);
+            } else if ("INTERN".equals(role)) {
+                canAdjust = false;
+                request.setAttribute(ERR, "Interns do not have stock adjustment access");
+                return mapping.findForward(FWD_UNAUTHORIZED);
+            } else {
+                canAdjust = false;
+                request.setAttribute(ERR, "Unknown role: cannot perform stock adjustment");
                 return mapping.findForward(FWD_UNAUTHORIZED);
             }
+
+            if (!canAdjust) {
+                return mapping.findForward(FWD_UNAUTHORIZED);
+            }
+
+            System.out.println("adjustStock: role=" + role + " maxAdj=" + maxAdjustment
+                + " canAdjust=" + canAdjust + " approval=" + requiresApproval
+                + " note=" + approvalNote);
 
             String method = request.getParameter("_method");
             if ("GET".equalsIgnoreCase(request.getMethod()) || CommonUtil.isEmpty(method)) {
@@ -175,6 +233,10 @@ public class InventoryAction extends DispatchAction implements AppConstants {
                     request.setAttribute("book", book);
 
                     int maxAdj = UserManager.getInstance().getMaxAdjustment(role);
+                    // Override with our authorization hierarchy value
+                    if (maxAdjustment < maxAdj) {
+                        maxAdj = maxAdjustment;
+                    }
                     request.setAttribute("maxAdjustment", String.valueOf(maxAdj));
                 }
                 return mapping.findForward(FWD_SUCCESS);
@@ -212,9 +274,29 @@ public class InventoryAction extends DispatchAction implements AppConstants {
                 return mapping.findForward(FWD_SUCCESS);
             }
 
+            // Check against role-based max adjustment
+            if (qtyInt > maxAdjustment) {
+                request.setAttribute(ERR, "Quantity " + qtyInt + " exceeds maximum allowed (" + maxAdjustment + ") for role " + role);
+                return mapping.findForward(FWD_SUCCESS);
+            }
+
             if (CommonUtil.isEmpty(reason)) {
                 request.setAttribute(ERR, "Reason is required");
                 return mapping.findForward(FWD_SUCCESS);
+            }
+
+            // Concurrent modification check with synchronized cache
+            synchronized(thresholdCache) {
+                String cacheKey = "adj_" + bookId;
+                if (thresholdCache.containsKey(cacheKey)) {
+                    long lastAdj = Long.parseLong((String) thresholdCache.get(cacheKey));
+                    if (System.currentTimeMillis() - lastAdj < 2000) {
+                        System.out.println("WARNING: rapid adjustment on same book: " + bookId);
+                        // Add extra delay to prevent rapid fire adjustments
+                        try { Thread.sleep(500); } catch (InterruptedException ie) { }
+                    }
+                }
+                thresholdCache.put(cacheKey, String.valueOf(System.currentTimeMillis()));
             }
 
             try { Thread.sleep(100); } catch (InterruptedException e) { }
@@ -236,6 +318,91 @@ public class InventoryAction extends DispatchAction implements AppConstants {
                 session.setAttribute("transactions", transactions);
             } else {
                 request.setAttribute(ERR, "Stock adjustment failed");
+            }
+
+            // Load recent transactions for this book via raw JDBC
+            java.sql.Connection txConn = null;
+            java.sql.Statement txStmt = null;
+            java.sql.ResultSet txRs = null;
+            try {
+                Class.forName("com.mysql.jdbc.Driver");
+                txConn = java.sql.DriverManager.getConnection(
+                    "jdbc:mysql://legacy-mysql:3306/legacy_db?useSSL=false", "legacy_user", "legacy_pass");
+                txStmt = txConn.createStatement();
+                txRs = txStmt.executeQuery("SELECT * FROM stock_transaction WHERE book_id = '" + bookId + "' ORDER BY crt_dt DESC LIMIT 10");
+                List recentTxns = new ArrayList();
+                while (txRs.next()) {
+                    Map txn = new HashMap();
+                    txn.put("type", txRs.getString("txn_type"));
+                    txn.put("qty", txRs.getString("qty_change"));
+                    txn.put("date", txRs.getString("crt_dt"));
+                    txn.put("user", txRs.getString("user_id"));
+                    recentTxns.add(txn);
+                }
+                session.setAttribute("recentTransactions", recentTxns);
+                System.out.println("Loaded " + recentTxns.size() + " recent transactions for book " + bookId);
+            } catch (Exception txEx) {
+                txEx.printStackTrace();
+                System.out.println("Failed to load recent transactions: " + txEx.getMessage());
+            } finally {
+                try { if (txRs != null) txRs.close(); } catch (Exception e) {}
+                try { if (txStmt != null) txStmt.close(); } catch (Exception e) {}
+                try { if (txConn != null) txConn.close(); } catch (Exception e) {}
+            }
+
+            // Also check current stock level and set warning flags
+            java.sql.Connection chkConn = null;
+            java.sql.Statement chkStmt = null;
+            java.sql.ResultSet chkRs = null;
+            try {
+                Class.forName("com.mysql.jdbc.Driver");
+                chkConn = java.sql.DriverManager.getConnection(
+                    "jdbc:mysql://legacy-mysql:3306/legacy_db?useSSL=false", "legacy_user", "legacy_pass");
+                chkStmt = chkConn.createStatement();
+                chkRs = chkStmt.executeQuery("SELECT qty_in_stock, title FROM books WHERE id = " + bookId);
+                if (chkRs.next()) {
+                    int currentStock = chkRs.getInt("qty_in_stock");
+                    String bookTitle = chkRs.getString("title");
+                    if (currentStock <= 0) {
+                        session.setAttribute("stockWarning", "CRITICAL: " + bookTitle + " is now OUT OF STOCK!");
+                        System.out.println("ALERT: Book " + bookId + " (" + bookTitle + ") is OUT OF STOCK after adjustment");
+                    } else if (currentStock <= CRITICAL_STOCK_THRESHOLD) {
+                        session.setAttribute("stockWarning", "WARNING: " + bookTitle + " stock is critically low (" + currentStock + ")");
+                    } else if (currentStock <= LOW_STOCK_THRESHOLD) {
+                        session.setAttribute("stockWarning", "NOTE: " + bookTitle + " stock is low (" + currentStock + ")");
+                    } else {
+                        session.removeAttribute("stockWarning");
+                    }
+                }
+            } catch (Exception chkEx) {
+                chkEx.printStackTrace();
+            } finally {
+                try { if (chkRs != null) chkRs.close(); } catch (Exception e) {}
+                try { if (chkStmt != null) chkStmt.close(); } catch (Exception e) {}
+                try { if (chkConn != null) chkConn.close(); } catch (Exception e) {}
+            }
+
+            // Inline audit log insert for stock adjustment tracking
+            java.sql.Connection auditConn = null;
+            try {
+                Class.forName("com.mysql.jdbc.Driver");
+                auditConn = java.sql.DriverManager.getConnection(
+                    "jdbc:mysql://legacy-mysql:3306/legacy_db?useSSL=false", "legacy_user", "legacy_pass");
+                java.sql.PreparedStatement auditPs = auditConn.prepareStatement(
+                    "INSERT INTO audit_log (action_type, user_id, username, details, ip_address, crt_dt) VALUES (?, ?, ?, ?, ?, ?)");
+                auditPs.setString(1, "STOCK_ADJ_" + adjType);
+                auditPs.setString(2, "");
+                auditPs.setString(3, username);
+                auditPs.setString(4, "Book=" + bookId + " adj=" + adjType + " qty=" + qty + " reason=" + reason
+                    + " role=" + role + " approval=" + approvalNote);
+                auditPs.setString(5, request.getRemoteAddr());
+                auditPs.setString(6, new java.text.SimpleDateFormat("yyyy/MM/dd HH:mm:ss").format(new java.util.Date()));
+                auditPs.executeUpdate();
+                auditPs.close();
+            } catch (Exception ae) {
+                System.out.println("Audit insert failed for stock adjustment: " + ae.getMessage());
+            } finally {
+                try { if (auditConn != null) auditConn.close(); } catch (Exception e) {}
             }
 
             return mapping.findForward(FWD_SUCCESS);

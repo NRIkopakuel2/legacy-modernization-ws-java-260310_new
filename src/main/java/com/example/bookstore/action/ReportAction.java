@@ -214,10 +214,86 @@ public class ReportAction extends DispatchAction implements AppConstants {
             String rankBy = request.getParameter("rankBy");
             String topN = request.getParameter("topN");
 
+            // ---- Inline date range validation ----
+            boolean datesValid = true;
+            if (CommonUtil.isNotEmpty(startDate)) {
+                try {
+                    java.text.SimpleDateFormat checkFmt = new java.text.SimpleDateFormat("yyyy-MM-dd");
+                    checkFmt.setLenient(false);
+                    checkFmt.parse(startDate);
+                } catch (Exception de) {
+                    try {
+                        java.text.SimpleDateFormat altFmt = new java.text.SimpleDateFormat("yyyyMMdd");
+                        java.util.Date d = altFmt.parse(startDate);
+                        startDate = new java.text.SimpleDateFormat("yyyy-MM-dd").format(d);
+                    } catch (Exception de2) {
+                        try {
+                            java.text.SimpleDateFormat altFmt2 = new java.text.SimpleDateFormat("yyyy/MM/dd");
+                            java.util.Date d2 = altFmt2.parse(startDate);
+                            startDate = new java.text.SimpleDateFormat("yyyy-MM-dd").format(d2);
+                        } catch (Exception de3) {
+                            datesValid = false;
+                            System.out.println("exportCsv: invalid startDate format: " + startDate);
+                        }
+                    }
+                }
+            }
+            if (CommonUtil.isNotEmpty(endDate)) {
+                try {
+                    java.text.SimpleDateFormat checkFmt2 = new java.text.SimpleDateFormat("yyyy-MM-dd");
+                    checkFmt2.setLenient(false);
+                    checkFmt2.parse(endDate);
+                } catch (Exception de) {
+                    try {
+                        java.text.SimpleDateFormat altFmt = new java.text.SimpleDateFormat("yyyyMMdd");
+                        java.util.Date d = altFmt.parse(endDate);
+                        endDate = new java.text.SimpleDateFormat("yyyy-MM-dd").format(d);
+                    } catch (Exception de2) {
+                        try {
+                            java.text.SimpleDateFormat altFmt2 = new java.text.SimpleDateFormat("yyyy/MM/dd");
+                            java.util.Date d2 = altFmt2.parse(endDate);
+                            endDate = new java.text.SimpleDateFormat("yyyy-MM-dd").format(d2);
+                        } catch (Exception de3) {
+                            datesValid = false;
+                            System.out.println("exportCsv: invalid endDate format: " + endDate);
+                        }
+                    }
+                }
+            }
+            if (!datesValid) {
+                request.setAttribute(ERR, "Invalid date format. Use yyyy-MM-dd, yyyyMMdd, or yyyy/MM/dd");
+                return mapping.findForward(FWD_ERROR);
+            }
+
+            // Validate date range makes sense (start <= end)
+            if (CommonUtil.isNotEmpty(startDate) && CommonUtil.isNotEmpty(endDate)) {
+                try {
+                    java.text.SimpleDateFormat cmpFmt = new java.text.SimpleDateFormat("yyyy-MM-dd");
+                    java.util.Date sd = cmpFmt.parse(startDate);
+                    java.util.Date ed = cmpFmt.parse(endDate);
+                    if (sd.after(ed)) {
+                        // Swap dates silently
+                        String tmpDate = startDate;
+                        startDate = endDate;
+                        endDate = tmpDate;
+                        System.out.println("exportCsv: swapped start/end dates");
+                    }
+                    // Check range not too large (max 365 days)
+                    long diffMs = ed.getTime() - sd.getTime();
+                    long diffDays = diffMs / (1000 * 60 * 60 * 24);
+                    if (diffDays > 365) {
+                        System.out.println("exportCsv WARNING: date range is " + diffDays + " days, may be slow");
+                    }
+                } catch (Exception cmpEx) {
+                    // ignore comparison errors
+                }
+            }
+
             java.sql.Connection conn = null;
             java.sql.Statement stmt = null;
             java.sql.ResultSet rs = null;
             String orderTotal = "0";
+            int orderCount = 0;
             try {
                 Class.forName("com.mysql.jdbc.Driver");
                 conn = java.sql.DriverManager.getConnection(
@@ -226,13 +302,14 @@ public class ReportAction extends DispatchAction implements AppConstants {
                 rs = stmt.executeQuery("SELECT COUNT(*) as cnt, SUM(total_amount) as total FROM orders WHERE order_date BETWEEN '" + startDate + "' AND '" + endDate + "'");
                 if (rs.next()) {
                     orderTotal = String.valueOf(rs.getDouble("total"));
+                    orderCount = rs.getInt("cnt");
                 }
             } catch (Exception ex) {
                 ex.printStackTrace();
             } finally {
                 try { if (rs != null) rs.close(); } catch (Exception ex) { }
                 try { if (stmt != null) stmt.close(); } catch (Exception ex) { }
-
+                try { if (conn != null) conn.close(); } catch (Exception ex) { }
             }
 
             // Pre-load books for report enrichment
@@ -269,13 +346,135 @@ public class ReportAction extends DispatchAction implements AppConstants {
 
             if ("daily".equals(reportType)) {
                 csvContent = mgr.exportDailySalesCsv(startDate, endDate);
+
+                // Inline CSV header enrichment for daily report
+                if (csvContent != null && csvContent.length() > 0) {
+                    StringBuffer enriched = new StringBuffer();
+                    enriched.append("# Daily Sales Report\n");
+                    enriched.append("# Generated: " + new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new java.util.Date()) + "\n");
+                    enriched.append("# Period: " + startDate + " to " + endDate + "\n");
+                    enriched.append("# Total Orders: " + orderCount + "\n");
+                    enriched.append("# Grand Total: " + orderTotal + "\n");
+                    enriched.append("# Generated by: " + (String) session.getAttribute(USER) + "\n");
+                    enriched.append("\n");
+                    // Rebuild header line with additional columns
+                    String[] lines = csvContent.split("\n");
+                    if (lines.length > 0) {
+                        enriched.append(lines[0]);
+                        enriched.append(",Running Total,% of Grand Total\n");
+                        // Add running total and percentage columns
+                        double runningTotal = 0.0;
+                        double grandTotal = CommonUtil.toDouble(orderTotal);
+                        DecimalFormat moneyFmt = new DecimalFormat("#,##0.00");
+                        DecimalFormat pctFmt = new DecimalFormat("0.00");
+                        for (int li = 1; li < lines.length; li++) {
+                            if (lines[li].trim().length() == 0) continue;
+                            enriched.append(lines[li]);
+                            // Try to extract amount from last column
+                            String[] cells = lines[li].split(",");
+                            if (cells.length > 0) {
+                                try {
+                                    double amt = Double.parseDouble(cells[cells.length - 1].replaceAll("[^0-9.\\-]", ""));
+                                    runningTotal += amt;
+                                    String pct = grandTotal > 0 ? pctFmt.format((amt / grandTotal) * 100.0) : "0.00";
+                                    enriched.append("," + moneyFmt.format(runningTotal) + "," + pct + "%");
+                                } catch (NumberFormatException nfe) {
+                                    enriched.append(",,");
+                                }
+                            }
+                            enriched.append("\n");
+                        }
+                    }
+                    csvContent = enriched.toString();
+                }
             } else if ("bybook".equals(reportType)) {
                 csvContent = mgr.exportSalesByBookCsv(startDate, endDate, catId, sortBy);
+
+                // Inline CSV header enrichment for by-book report
+                if (csvContent != null && csvContent.length() > 0) {
+                    StringBuffer enriched = new StringBuffer();
+                    enriched.append("# Sales By Book Report\n");
+                    enriched.append("# Generated: " + new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new java.util.Date()) + "\n");
+                    enriched.append("# Period: " + startDate + " to " + endDate + "\n");
+                    if (CommonUtil.isNotEmpty(catId)) {
+                        enriched.append("# Category Filter: " + catId + "\n");
+                    }
+                    if (CommonUtil.isNotEmpty(sortBy)) {
+                        enriched.append("# Sort By: " + sortBy + "\n");
+                    }
+                    enriched.append("# Total Orders: " + orderCount + "\n");
+                    enriched.append("# Grand Total: " + orderTotal + "\n");
+                    enriched.append("\n");
+                    // Number formatting pass
+                    String[] lines = csvContent.split("\n");
+                    DecimalFormat moneyFmt2 = new DecimalFormat("#,##0.00");
+                    for (int li = 0; li < lines.length; li++) {
+                        if (li == 0) {
+                            enriched.append(lines[li]).append(",Formatted Price\n");
+                        } else {
+                            if (lines[li].trim().length() == 0) continue;
+                            enriched.append(lines[li]);
+                            String[] cells = lines[li].split(",");
+                            // Try to format numeric cells
+                            boolean foundPrice = false;
+                            for (int ci = 0; ci < cells.length; ci++) {
+                                try {
+                                    double val = Double.parseDouble(cells[ci].trim());
+                                    if (val > 1.0 && !foundPrice) {
+                                        enriched.append("," + moneyFmt2.format(val));
+                                        foundPrice = true;
+                                    }
+                                } catch (NumberFormatException nfe) {
+                                    // not a number
+                                }
+                            }
+                            if (!foundPrice) {
+                                enriched.append(",");
+                            }
+                            enriched.append("\n");
+                        }
+                    }
+                    csvContent = enriched.toString();
+                }
             } else if ("topbooks".equals(reportType)) {
                 csvContent = mgr.exportTopBooksCsv(startDate, endDate, rankBy, topN);
+
+                // Inline CSV header enrichment for top books report
+                if (csvContent != null && csvContent.length() > 0) {
+                    StringBuffer enriched = new StringBuffer();
+                    enriched.append("# Top Books Report\n");
+                    enriched.append("# Generated: " + new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new java.util.Date()) + "\n");
+                    enriched.append("# Period: " + startDate + " to " + endDate + "\n");
+                    enriched.append("# Rank By: " + CommonUtil.nvl(rankBy, "default") + "\n");
+                    enriched.append("# Top N: " + CommonUtil.nvl(topN, "10") + "\n");
+                    enriched.append("# Total Books in System: " + bookLookup.size() + "\n");
+                    enriched.append("\n");
+                    String[] lines = csvContent.split("\n");
+                    DecimalFormat moneyFmt3 = new DecimalFormat("#,##0.00");
+                    for (int li = 0; li < lines.length; li++) {
+                        if (li == 0) {
+                            enriched.append(lines[li]).append(",Rank\n");
+                        } else {
+                            if (lines[li].trim().length() == 0) continue;
+                            enriched.append(lines[li]);
+                            enriched.append("," + (li));
+                            enriched.append("\n");
+                        }
+                    }
+                    csvContent = enriched.toString();
+                }
             } else {
                 request.setAttribute(ERR, "Unknown report type");
                 return mapping.findForward(FWD_ERROR);
+            }
+
+            // Log the export for audit
+            try {
+                UserManager.getInstance().logAction("REPORT_EXPORT", "",
+                    "type=" + reportType + " startDate=" + startDate + " endDate=" + endDate
+                    + " rows=" + (csvContent != null ? csvContent.split("\n").length : 0), request);
+            } catch (Exception logEx) {
+                System.out.println("Failed to log report export: " + logEx.getMessage());
             }
 
             response.setContentType("text/csv; charset=UTF-8");
