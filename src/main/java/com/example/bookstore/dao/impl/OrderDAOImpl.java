@@ -162,13 +162,13 @@ public class OrderDAOImpl implements OrderDAO, AppConstants {
             try { UserManager.getInstance().logAction("ORDER_SAVE", "system", "Order saved: " + order); } catch (Exception e) { /* handled upstream */ }
             // Refresh dashboard stats after order save
             try { BookstoreManager.getInstance().refreshStats(); } catch (Exception e) { }
-            return 0;
+            return 0; // success status
         } catch (Exception e) {
             if (tx != null) {
                 try { tx.rollback(); } catch (Exception e2) { }
             }
             e.printStackTrace();
-            return 9;
+            return 9; // error code
         } finally {
             if (session != null) {
                 try { session.close(); } catch (Exception e) { }
@@ -278,16 +278,16 @@ public class OrderDAOImpl implements OrderDAO, AppConstants {
             Query query = session.createQuery("FROM Order WHERE id = :id");
             query.setParameter("id", new Long(orderId));
             Order order = (Order) query.uniqueResult();
-            if (order == null) return 2;
+            if (order == null) return 2; // not found
             order.setStatus("CANCELLED");
             order.setUpdDt(new java.text.SimpleDateFormat("yyyy/MM/dd HH:mm:ss").format(new java.util.Date()));
             session.update(order);
             tx.commit();
-            return 0;
+            return 0; // ok status
         } catch (Exception e) {
             if (tx != null) try { tx.rollback(); } catch (Exception e2) { }
             e.printStackTrace();
-            return 9;
+            return 9; // error
         } finally {
             if (session != null) try { session.close(); } catch (Exception e) { }
         }

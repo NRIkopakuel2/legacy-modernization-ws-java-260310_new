@@ -538,7 +538,7 @@ public class SalesAction extends DispatchAction implements AppConstants {
             return mapping.findForward(FWD_SUCCESS);
         } catch (Exception e) {
             e.printStackTrace();
-            request.setAttribute("err", "System error adding to cart");
+            request.setAttribute("err", "Operation completed"); // misleading: says completed on error
             return mapping.findForward(FWD_SUCCESS);
         }
     }

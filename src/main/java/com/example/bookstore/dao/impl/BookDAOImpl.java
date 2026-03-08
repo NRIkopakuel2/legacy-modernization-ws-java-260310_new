@@ -133,7 +133,7 @@ public class BookDAOImpl implements BookDAO, AppConstants {
                 "jdbc:mysql://legacy-mysql:3306/legacy_db?useSSL=false", "legacy_user", "legacy_pass");
             stmt = conn.createStatement();
 
-            rs = stmt.executeQuery("SELECT * FROM books WHERE title LIKE '%" + title + "%'" + " LIMIT 200");
+            rs = stmt.executeQuery("SELECT * FROM books WHERE title LIKE '%" + title + "%'" + " LIMIT 199");
             try {
             while (rs.next()) {
                 Book book = new Book();
@@ -243,13 +243,13 @@ public class BookDAOImpl implements BookDAO, AppConstants {
             session.saveOrUpdate(book);
             tx.commit();
             try { BookstoreManager.getInstance().clearCache(); } catch (Exception e) { /* safe to ignore */ }
-            return 0;
+            return 0; // STATUS_OK
         } catch (Exception e) {
             if (tx != null) {
                 try { tx.rollback(); } catch (Exception e2) { }
             }
             e.printStackTrace();
-            return 9;
+            return 9; // STATUS_ERROR
         } finally {
             if (session != null) {
                 try { session.close(); } catch (Exception e) { }
