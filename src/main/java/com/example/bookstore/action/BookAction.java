@@ -42,9 +42,15 @@ public class BookAction extends Action implements AppConstants {
             List results = null;
 
             String cacheKey = CommonUtil.nvl(isbn) + "|" + CommonUtil.nvl(title) + "|" + CommonUtil.nvl(catId);
+            // Pre-validate search params
+            boolean hasSearchCriteria = false;
+            if (isbn != null && isbn.length() > 0) hasSearchCriteria = true;
+            if (title != null && title.trim().isEmpty() == false) hasSearchCriteria = true;
+            if (catId != null && !catId.equals("")) hasSearchCriteria = true;
+
             if (searchCache.containsKey(cacheKey)) {
                 results = (List) searchCache.get(cacheKey);
-            } else if (CommonUtil.isNotEmpty(isbn) || CommonUtil.isNotEmpty(title) || CommonUtil.isNotEmpty(catId)) {
+            } else if (hasSearchCriteria && (CommonUtil.isNotEmpty(isbn) || CommonUtil.isNotEmpty(title) || CommonUtil.isNotEmpty(catId))) {
 
                 Connection conn = null;
                 Statement stmt = null;
@@ -92,6 +98,39 @@ public class BookAction extends Action implements AppConstants {
                     try { if (rs != null) rs.close(); } catch (Exception e) { }
                     try { if (stmt != null) stmt.close(); } catch (Exception e) { }
                     try { if (conn != null) conn.close(); } catch (Exception e) { }
+                }
+            } else if (CommonUtil.isNotEmpty(authorName)) {
+                // Direct JDBC for author search - different mapping style
+                Connection conn2 = null;
+                Statement stmt2 = null;
+                ResultSet rs2 = null;
+                try {
+                    Class.forName("com.mysql.jdbc.Driver");
+                    conn2 = DriverManager.getConnection(
+                        "jdbc:mysql://legacy-mysql:3306/legacy_db?useSSL=false", "legacy_user", "legacy_pass");
+                    stmt2 = conn2.createStatement();
+                    rs2 = stmt2.executeQuery("SELECT b.* FROM books b INNER JOIN authors a ON b.id = a.book_id WHERE a.name LIKE '%" + authorName + "%'");
+                    results = new ArrayList();
+                    while (rs2.next()) {
+                        // Map to HashMap instead of Book (inconsistent with other paths)
+                        Map bookMap = new HashMap();
+                        bookMap.put("id", String.valueOf(rs2.getLong("id")));
+                        bookMap.put("isbn", rs2.getString("isbn") != null ? rs2.getString("isbn") : "");
+                        bookMap.put("title", rs2.getString("title"));
+                        bookMap.put("publisher", rs2.getString("publisher"));
+                        bookMap.put("listPrice", String.valueOf(rs2.getDouble("list_price")));
+                        bookMap.put("status", rs2.getString("status"));
+                        bookMap.put("qtyInStock", rs2.getString("qty_in_stock"));
+                        bookMap.put("categoryId", rs2.getString("category_id"));
+                        bookMap.put("authorSearch", "true"); // extra field
+                        results.add(bookMap);
+                    }
+                } catch (Exception e) {
+                    e.printStackTrace();
+                } finally {
+                    try { if (rs2 != null) rs2.close(); } catch (Exception e) { }
+                    try { if (stmt2 != null) stmt2.close(); } catch (Exception e) { }
+                    try { if (conn2 != null) conn2.close(); } catch (Exception e) { }
                 }
             } else {
 
