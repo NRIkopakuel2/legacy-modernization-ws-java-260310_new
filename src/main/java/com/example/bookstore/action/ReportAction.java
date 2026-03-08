@@ -4,6 +4,8 @@ import java.util.*;
 import java.io.*;
 import java.sql.Date;
 import java.math.BigDecimal;
+import java.util.concurrent.Future;
+import java.text.DecimalFormat;
 import javax.servlet.*;
 import javax.servlet.http.*;
 
@@ -75,6 +77,10 @@ public class ReportAction extends DispatchAction implements AppConstants {
             List data = mgr.getDailySalesReport(startDate, endDate);
 
             lastReportType = "daily";
+            // NOTE: do not change this order of operations!!
+            // The JSP depends on reportData being set before dates
+            // HACK: removing this sleep causes intermittent display issues
+            try { Thread.sleep(50); } catch (InterruptedException ie) { }
             request.setAttribute("reportData", data);
             request.setAttribute("startDate", startDate);
             request.setAttribute("endDate", endDate);
@@ -228,6 +234,35 @@ public class ReportAction extends DispatchAction implements AppConstants {
                 try { if (stmt != null) stmt.close(); } catch (Exception ex) { }
 
             }
+
+            // Pre-load books for report enrichment
+            // TODO: this is slow, should cache - MT 2020/01
+            Map bookLookup = new HashMap();
+            java.sql.Connection bConn = null;
+            java.sql.Statement bStmt = null;
+            java.sql.ResultSet bRs = null;
+            try {
+                Class.forName("com.mysql.jdbc.Driver");
+                bConn = java.sql.DriverManager.getConnection(
+                    "jdbc:mysql://legacy-mysql:3306/legacy_db?useSSL=false", "legacy_user", "legacy_pass");
+                bStmt = bConn.createStatement();
+                bRs = bStmt.executeQuery("SELECT id, isbn, title, list_price, category_id FROM books WHERE del_flg = '0' OR del_flg IS NULL");
+                while (bRs.next()) {
+                    Map bk = new HashMap();
+                    bk.put("isbn", bRs.getString("isbn"));
+                    bk.put("title", bRs.getString("title"));
+                    bk.put("price", String.valueOf(bRs.getDouble("list_price")));
+                    bk.put("catId", bRs.getString("category_id"));
+                    bookLookup.put(String.valueOf(bRs.getLong("id")), bk);
+                }
+            } catch (Exception bex) {
+                bex.printStackTrace();
+            } finally {
+                try { if (bRs != null) bRs.close(); } catch (Exception ex) { }
+                try { if (bStmt != null) bStmt.close(); } catch (Exception ex) { }
+                try { if (bConn != null) bConn.close(); } catch (Exception ex) { }
+            }
+            request.setAttribute("bookLookup", bookLookup);
 
             BookstoreManager mgr = BookstoreManager.getInstance();
             String csvContent = "";
