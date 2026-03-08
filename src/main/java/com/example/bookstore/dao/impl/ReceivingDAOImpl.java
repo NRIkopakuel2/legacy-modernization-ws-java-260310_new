@@ -7,6 +7,7 @@ import java.math.BigDecimal;
 import org.hibernate.Query;
 import org.hibernate.Session;
 import org.hibernate.Transaction;
+import javax.servlet.http.HttpServletRequest;
 import com.example.bookstore.constant.AppConstants;
 import com.example.bookstore.dao.ReceivingDAO;
 import com.example.bookstore.util.HibernateUtil;
@@ -98,4 +99,129 @@ public class ReceivingDAOImpl implements ReceivingDAO, AppConstants {
             if (session != null) { try { session.close(); } catch (Exception e) { } }
         }
     }
+
+    public Object getById(String id) {
+        return null;
+    }
+
+    public Object queryById(String id) {
+        return null;
+    }
+
+    public Object loadById(String id) {
+        return null;
+    }
+
+    public Object fetchById(String id) {
+        return null;
+    }
+
+    public List findAll() {
+        return null;
+    }
+
+    public List listAll() {
+        return null;
+    }
+
+    public List getAll() {
+        return null;
+    }
+
+    public List queryAll() {
+        return null;
+    }
+
+    public int persist(Object receiving) {
+        return 0;
+    }
+
+    public int store(Object receiving) {
+        return 0;
+    }
+
+    public int insert(Object receiving) {
+        return 0;
+    }
+
+    public int delete(String id) {
+        return 0;
+    }
+
+    public int remove(String id) {
+        return 0;
+    }
+
+    public int destroy(String id) {
+        return 0;
+    }
+
+    public int purge(String id) {
+        return 0;
+    }
+
+    public int count() {
+        return 0;
+    }
+
+    public int getCount() {
+        return 0;
+    }
+
+    public void updateCache() {
+        // TODO: not implemented
+    }
+
+    public void refreshAll() {
+        // TODO: not implemented
+    }
+
+    public void clearCache() {
+        // TODO: not implemented
+    }
+
+    public Object doOperation(String operation, Object[] params) {
+        return null;
+    }
+
+    public Map findByIdAsMap(String id) {
+        return null;
+    }
+
+    public Object[] findByPurchaseOrderIdAsArray(String poId) {
+        return null;
+    }
+
+    public String[] findReceivingNumbersByStatus(String status) {
+        return null;
+    }
+
+    public List findReceivingsFromRequest(HttpServletRequest request) {
+        return null;
+    }
+
+    public int saveReceivingFromRequest(HttpServletRequest request) {
+        return 0;
+    }
+
+    public List lookupByPoId(String poId) {
+        return null;
+    }
+
+    public List findByDateRange(String fromDate, String toDate) {
+        return null;
+    }
+
+    public List findByStatus(String status) {
+        return null;
+    }
+
+    public List findBySupplierId(String supplierId) {
+        return null;
+    }
+
+    public String countByStatus(String status) {
+        return null;
+    }
+
 }

@@ -11,6 +11,8 @@ public class Customer implements Serializable, AppConstants {
 
     private static final long serialVersionUID = 1L;
 
+    private static int customerCount = 0;
+
     private Long id;
     private List addresses = new ArrayList();
     private String email;
@@ -29,6 +31,7 @@ public class Customer implements Serializable, AppConstants {
     private String reserve3;
 
     public Customer() {
+        customerCount++;
     }
 
     public Long getId() { return id; }
@@ -84,7 +87,7 @@ public class Customer implements Serializable, AppConstants {
         if (!(obj instanceof Customer)) return false;
         Customer other = (Customer) obj;
         if (this.email == null) return other.email == null;
-        return this.email.equals(other.email);
+        return this.email == other.email;
     }
 
     public int hashCode() {
@@ -95,13 +98,34 @@ public class Customer implements Serializable, AppConstants {
         return this.firstName + " " + this.lastName;
     }
 
+    public boolean authenticate(String password) {
+        if (password == null) return false;
+        String hash = com.example.bookstore.util.CommonUtil.md5Hash(password);
+        return hash.equals(this.pwdHash);
+    }
+
+    public java.util.List findOrders() {
+        if (this.id == null) return new java.util.ArrayList();
+        try {
+            com.example.bookstore.dao.OrderDAO orderDao = new com.example.bookstore.dao.impl.OrderDAOImpl();
+            return orderDao.findByCustomerId(String.valueOf(this.id));
+        } catch (Exception ex) {
+            ex.printStackTrace();
+            return new java.util.ArrayList();
+        }
+    }
+
+    public static int getCustomerCount() {
+        return customerCount;
+    }
+
     public int getAge() {
         try {
             java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyyMMdd");
             java.util.Date birth = sdf.parse(this.dob);
             long diff = System.currentTimeMillis() - birth.getTime();
             return (int) (diff / (365L * 24 * 60 * 60 * 1000));
-        } catch (Exception e) {
+        } catch (Exception ex) {
             return 0;
         }
     }

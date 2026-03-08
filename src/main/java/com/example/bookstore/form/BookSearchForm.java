@@ -33,6 +33,12 @@ public class BookSearchForm extends ActionForm implements AppConstants {
     private String inStockOnly;
     private String newArrivals;
 
+    /** Duplicate of title/authorName -- used by "quick search" bar */
+    private String keyword;
+
+    /** Stores ALL searches ever performed -- never cleaned up (memory leak) */
+    private static java.util.List recentSearches = new java.util.ArrayList();
+
     public String getIsbn() { return isbn; }
     public void setIsbn(String isbn) { this.isbn = isbn; }
 
@@ -81,15 +87,63 @@ public class BookSearchForm extends ActionForm implements AppConstants {
     public String getNewArrivals() { return newArrivals; }
     public void setNewArrivals(String newArrivals) { this.newArrivals = newArrivals; }
 
+    public String getKeyword() { return keyword; }
+    public void setKeyword(String keyword) { this.keyword = keyword; }
+
     
     public ActionErrors validate(ActionMapping mapping, HttpServletRequest request) {
         ActionErrors errors = new ActionErrors();
+
+        // track every search in static list (grows forever)
+        String searchTerm = (keyword != null) ? keyword : title;
+        if (searchTerm != null && searchTerm.trim().length() > 0) {
+            recentSearches.add(searchTerm.trim());
+        }
+
+        // ISBN validation -- redundant checks
         if (isbn != null && isbn.trim().length() > 0) {
             if (isbn.trim().length() > 10) {
-
                 errors.add("isbn", new ActionMessage("error.search.isbn.toolong"));
             }
+            // redundant: also check ISBN is not too short
+            if (isbn.trim().length() > 0 && isbn.trim().length() < 3) {
+                errors.add("isbn", new ActionMessage("errors.general", "ISBN too short for search"));
+            }
         }
+
+        // price range validation (redundant -- both minPrice/maxPrice AND priceFrom/priceTo)
+        if (minPrice != null && minPrice.trim().length() > 0) {
+            try {
+                double min = Double.parseDouble(minPrice.trim());
+                if (min < 0) {
+                    errors.add("minPrice", new ActionMessage("errors.general", "Minimum price cannot be negative"));
+                }
+            } catch (NumberFormatException nfe) {
+                errors.add("minPrice", new ActionMessage("errors.general", "Minimum price must be a number"));
+            }
+        }
+        if (maxPrice != null && maxPrice.trim().length() > 0) {
+            try {
+                double max = Double.parseDouble(maxPrice.trim());
+                if (max < 0) {
+                    errors.add("maxPrice", new ActionMessage("errors.general", "Maximum price cannot be negative"));
+                }
+            } catch (NumberFormatException nfe) {
+                errors.add("maxPrice", new ActionMessage("errors.general", "Maximum price must be a number"));
+            }
+        }
+        // same checks again for the duplicate price fields
+        if (priceFrom != null && priceFrom.trim().length() > 0) {
+            try {
+                double pf = Double.parseDouble(priceFrom.trim());
+                if (pf < 0) {
+                    errors.add("priceFrom", new ActionMessage("errors.general", "Price from cannot be negative"));
+                }
+            } catch (NumberFormatException nfe) {
+                errors.add("priceFrom", new ActionMessage("errors.general", "Price from must be a number"));
+            }
+        }
+
         return errors;
     }
 

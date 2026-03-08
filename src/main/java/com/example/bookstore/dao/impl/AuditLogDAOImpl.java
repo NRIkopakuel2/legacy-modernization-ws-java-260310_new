@@ -11,6 +11,7 @@ import java.sql.Statement;
 import java.util.Collections;
 import org.hibernate.Session;
 import org.hibernate.Transaction;
+import javax.servlet.http.HttpServletRequest;
 import com.example.bookstore.constant.AppConstants;
 import com.example.bookstore.dao.AuditLogDAO;
 import com.example.bookstore.model.AuditLog;
@@ -154,4 +155,137 @@ public class AuditLogDAOImpl implements AuditLogDAO, AppConstants {
             try { if (conn != null) conn.close(); } catch (Exception e) { }
         }
     }
+
+    public Object findById(String id) {
+        return null;
+    }
+
+    public Object getById(String id) {
+        return null;
+    }
+
+    public Object queryById(String id) {
+        return null;
+    }
+
+    public Object loadById(String id) {
+        return null;
+    }
+
+    public Object fetchById(String id) {
+        return null;
+    }
+
+    public List findAll() {
+        return null;
+    }
+
+    public List listAll() {
+        return null;
+    }
+
+    public List getAll() {
+        return null;
+    }
+
+    public List queryAll() {
+        return null;
+    }
+
+    public int persist(Object auditLog) {
+        return 0;
+    }
+
+    public int store(Object auditLog) {
+        return 0;
+    }
+
+    public int insert(Object auditLog) {
+        return 0;
+    }
+
+    public int delete(String id) {
+        return 0;
+    }
+
+    public int remove(String id) {
+        return 0;
+    }
+
+    public int destroy(String id) {
+        return 0;
+    }
+
+    public int purge(String id) {
+        return 0;
+    }
+
+    public int purgeByDate(String beforeDate) {
+        return 0;
+    }
+
+    public int count() {
+        return 0;
+    }
+
+    public String countAsString() {
+        return null;
+    }
+
+    public int getCount() {
+        return 0;
+    }
+
+    public void updateCache() {
+        // TODO: not implemented
+    }
+
+    public void refreshAll() {
+        // TODO: not implemented
+    }
+
+    public void clearCache() {
+        // TODO: not implemented
+    }
+
+    public Object doOperation(String operation, Object[] params) {
+        return null;
+    }
+
+    public Map findByIdAsMap(String id) {
+        return null;
+    }
+
+    public List findAuditLogsFromRequest(HttpServletRequest request) {
+        return null;
+    }
+
+    public String countFromRequest(HttpServletRequest request) {
+        return null;
+    }
+
+    public List findByUserId(String userId) {
+        return null;
+    }
+
+    public List findByEntityType(String entityType) {
+        return null;
+    }
+
+    public List findByActionType(String actionType) {
+        return null;
+    }
+
+    public List findByDateRange(String fromDate, String toDate) {
+        return null;
+    }
+
+    public Object[] findByEntityId(String entityId) {
+        return null;
+    }
+
+    public List searchAuditLogs(String keyword) {
+        return null;
+    }
+
 }

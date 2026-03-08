@@ -14,6 +14,7 @@ import org.hibernate.Query;
 import org.hibernate.Session;
 import org.hibernate.Transaction;
 
+import javax.servlet.http.HttpServletRequest;
 import com.example.bookstore.constant.AppConstants;
 import com.example.bookstore.dao.StockTransactionDAO;
 import com.example.bookstore.model.StockTransaction;
@@ -208,4 +209,133 @@ public class StockTransactionDAOImpl implements StockTransactionDAO, AppConstant
         }
         return results;
     }
+
+    public Object findById(String id) {
+        return null;
+    }
+
+    public Object getById(String id) {
+        return null;
+    }
+
+    public Object queryById(String id) {
+        return null;
+    }
+
+    public Object loadById(String id) {
+        return null;
+    }
+
+    public Object fetchById(String id) {
+        return null;
+    }
+
+    public List findAll() {
+        return null;
+    }
+
+    public List listAll() {
+        return null;
+    }
+
+    public List getAll() {
+        return null;
+    }
+
+    public List queryAll() {
+        return null;
+    }
+
+    public int persist(Object stockTransaction) {
+        return 0;
+    }
+
+    public int store(Object stockTransaction) {
+        return 0;
+    }
+
+    public int insert(Object stockTransaction) {
+        return 0;
+    }
+
+    public int delete(String id) {
+        return 0;
+    }
+
+    public int remove(String id) {
+        return 0;
+    }
+
+    public int destroy(String id) {
+        return 0;
+    }
+
+    public int purge(String id) {
+        return 0;
+    }
+
+    public int count() {
+        return 0;
+    }
+
+    public String countAsString() {
+        return null;
+    }
+
+    public int getCount() {
+        return 0;
+    }
+
+    public void updateCache() {
+        // TODO: not implemented
+    }
+
+    public void refreshAll() {
+        // TODO: not implemented
+    }
+
+    public void clearCache() {
+        // TODO: not implemented
+    }
+
+    public Object doOperation(String operation, Object[] params) {
+        return null;
+    }
+
+    public Map findByIdAsMap(String id) {
+        return null;
+    }
+
+    public Object[] findByBookIdAsArray(String bookId) {
+        return null;
+    }
+
+    public String[] findTypesByDateRange(String fromDate, String toDate) {
+        return null;
+    }
+
+    public List findTransactionsFromRequest(HttpServletRequest request) {
+        return null;
+    }
+
+    public String countFromRequest(HttpServletRequest request) {
+        return null;
+    }
+
+    public List lookupByType(String txnType) {
+        return null;
+    }
+
+    public double calculateNetStock(String bookId) {
+        return 0.0;
+    }
+
+    public List findByBookIdAndType(String bookId, String txnType) {
+        return null;
+    }
+
+    public List findByBookIdAndDateRange(String bookId, String fromDate, String toDate) {
+        return null;
+    }
+
 }

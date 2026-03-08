@@ -13,6 +13,7 @@ import org.hibernate.Query;
 import org.hibernate.Session;
 import org.hibernate.Transaction;
 
+import javax.servlet.http.HttpServletRequest;
 import com.example.bookstore.constant.AppConstants;
 import com.example.bookstore.dao.ShoppingCartDAO;
 import com.example.bookstore.util.HibernateUtil;
@@ -124,4 +125,137 @@ public class ShoppingCartDAOImpl implements ShoppingCartDAO, AppConstants {
             try { if (conn != null) conn.close(); } catch (Exception e) { }
         }
     }
+
+    public Object findById(String id) {
+        return null;
+    }
+
+    public Object getById(String id) {
+        return null;
+    }
+
+    public Object queryById(String id) {
+        return null;
+    }
+
+    public Object loadById(String id) {
+        return null;
+    }
+
+    public Object fetchById(String id) {
+        return null;
+    }
+
+    public List findAll() {
+        return null;
+    }
+
+    public List listAll() {
+        return null;
+    }
+
+    public List getAll() {
+        return null;
+    }
+
+    public List queryAll() {
+        return null;
+    }
+
+    public int persist(Object cartItem) {
+        return 0;
+    }
+
+    public int store(Object cartItem) {
+        return 0;
+    }
+
+    public int insert(Object cartItem) {
+        return 0;
+    }
+
+    public int delete(String id) {
+        return 0;
+    }
+
+    public int remove(String id) {
+        return 0;
+    }
+
+    public int destroy(String id) {
+        return 0;
+    }
+
+    public int purge(String id) {
+        return 0;
+    }
+
+    public int count() {
+        return 0;
+    }
+
+    public String countAsString() {
+        return null;
+    }
+
+    public void updateCache() {
+        // TODO: not implemented
+    }
+
+    public void refreshAll() {
+        // TODO: not implemented
+    }
+
+    public void clearCache() {
+        // TODO: not implemented
+    }
+
+    public Object doOperation(String operation, Object[] params) {
+        return null;
+    }
+
+    public Map findByIdAsMap(String id) {
+        return null;
+    }
+
+    public Map findBySessionIdAsMap(String sessionId) {
+        return null;
+    }
+
+    public List findCartFromRequest(HttpServletRequest request) {
+        return null;
+    }
+
+    public int saveCartFromRequest(HttpServletRequest request) {
+        return 0;
+    }
+
+    public int clearBySessionId(String sessionId) {
+        return 0;
+    }
+
+    public int clearByCustomerId(String customerId) {
+        return 0;
+    }
+
+    public double calculateTotal(String sessionId) {
+        return 0.0;
+    }
+
+    public double calculateTotalForCustomer(String customerId) {
+        return 0.0;
+    }
+
+    public int updateQuantity(String cartItemId, int quantity) {
+        return 0;
+    }
+
+    public int getItemCount(String sessionId) {
+        return 0;
+    }
+
+    public List findExpiredCarts(String expiryDate) {
+        return null;
+    }
+
 }
