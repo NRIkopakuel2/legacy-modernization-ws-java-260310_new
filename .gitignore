@@ -10,7 +10,8 @@ jdk-*-linux-*.bin
 *.ear
 target/
 build/
-dist/
+dist/*
+!dist/.gitkeep
 
 # IDE files
 .vscode/
