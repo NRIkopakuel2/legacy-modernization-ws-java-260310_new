@@ -1,0 +1,299 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE web-app PUBLIC
+    "-//Sun Microsystems, Inc.//DTD Web Application 2.3//EN"
+    "http://java.sun.com/dtd/web-app_2_3.dtd">
+
+<web-app>
+
+    <display-name>Legacy Bookstore Application</display-name>
+
+    <!-- Global debug level - overrides servlet debug param - added by HN 2019/05 -->
+    <context-param>
+        <param-name>debug</param-name>
+        <param-value>0</param-value>
+    </context-param>
+
+    <!-- Upload directory for book cover images - HN 2018/01 -->
+    <context-param>
+        <param-name>uploadDir</param-name>
+        <param-value>/home/dev1/uploads</param-value>
+    </context-param>
+    <!-- Temp directory used by report generation batch job - SK 2017/09 -->
+	<context-param>
+		<param-name>tempDir</param-name>
+		<param-value>/opt/bookstore/tmp</param-value>
+	</context-param>
+    <!-- Path to external config properties file - MT 2020/08
+         TODO: This path only works on the old CI server, need to parameterize (BOOK-398) -->
+    <context-param>
+      <param-name>configLocation</param-name>
+      <param-value>/home/dev1/bookstore/config/app.properties</param-value>
+    </context-param>
+
+    <!-- Encoding filter - added by TK 2018/04 -->
+    <filter>
+        <filter-name>EncodingFilter</filter-name>
+        <filter-class>com.example.bookstore.filter.CharacterEncodingFilter</filter-class>
+        <init-param>
+            <param-name>encoding</param-name>
+            <param-value>UTF-8</param-value>
+        </init-param>
+    </filter>
+    <!-- NOTE: Also see encoding-filter below, not sure which one is active - MT 2020/11 -->
+
+    <!-- Authentication filter - DISABLED, using Struts validation instead
+         TODO: re-enable when session management is fixed - YT 2019/08
+    <filter>
+        <filter-name>AuthFilter</filter-name>
+        <filter-class>com.example.bookstore.filter.AuthenticationFilter</filter-class>
+        <init-param>
+            <param-name>excludePaths</param-name>
+            <param-value>/login.do,/logout.do,/css/,/js/,/images/</param-value>
+        </init-param>
+    </filter>
+    <filter-mapping>
+        <filter-name>AuthFilter</filter-name>
+        <url-pattern>*.do</url-pattern>
+    </filter-mapping>
+    -->
+
+    <!-- Encoding filter v1 - DISABLED, causes double-encoding with Struts
+    <filter>
+        <filter-name>EncodingFilter</filter-name>
+        <filter-class>com.example.bookstore.filter.CharacterEncodingFilter</filter-class>
+        <init-param>
+            <param-name>encoding</param-name>
+            <param-value>UTF-8</param-value>
+        </init-param>
+    </filter>
+    -->
+
+    <!-- Second encoding filter definition - added by SK 2019/01 after TK left
+         Not sure if this conflicts with the one above -->
+    <filter>
+      <filter-name>encoding-filter</filter-name>
+      <filter-class>com.example.bookstore.filter.CharacterEncodingFilter</filter-class>
+      <init-param>
+        <param-name>encoding</param-name>
+        <param-value>Shift_JIS</param-value>
+      </init-param>
+      <init-param>
+        <param-name>forceEncoding</param-name>
+        <param-value>true</param-value>
+      </init-param>
+    </filter>
+
+    <!-- CORS filter - DISABLED: broke IE11 compatibility - YT 2019/12
+         TODO: re-enable after IE11 EOL (BOOK-567)
+    <filter>
+        <filter-name>CORSFilter</filter-name>
+        <filter-class>com.example.bookstore.filter.SimpleCORSFilter</filter-class>
+        <init-param>
+            <param-name>cors.allowed.origins</param-name>
+            <param-value>*</param-value>
+        </init-param>
+        <init-param>
+            <param-name>cors.allowed.methods</param-name>
+            <param-value>GET,POST,PUT,DELETE,OPTIONS</param-value>
+        </init-param>
+        <init-param>
+            <param-name>cors.allowed.headers</param-name>
+            <param-value>Content-Type,X-Requested-With,Accept,Authorization</param-value>
+        </init-param>
+    </filter>
+    <filter-mapping>
+        <filter-name>CORSFilter</filter-name>
+        <url-pattern>/*</url-pattern>
+    </filter-mapping>
+    -->
+
+    <filter-mapping>
+        <filter-name>EncodingFilter</filter-name>
+        <url-pattern>/*</url-pattern>
+    </filter-mapping>
+    <!-- encoding-filter mapping disabled - was causing mojibake with file downloads - SK 2019/03
+    <filter-mapping>
+        <filter-name>encoding-filter</filter-name>
+        <url-pattern>/*</url-pattern>
+    </filter-mapping>
+    -->
+
+    <!-- Disabled: causes redirect loops - MT 2019/04
+         The filter checks session timeout and redirects to login.do,
+         but login.do itself triggers the filter, creating an infinite loop.
+         See BOOK-312 for details.
+    <filter>
+        <filter-name>SessionTimeoutFilter</filter-name>
+        <filter-class>com.example.bookstore.filter.SessionTimeoutFilter</filter-class>
+    </filter>
+    <filter-mapping>
+        <filter-name>SessionTimeoutFilter</filter-name>
+        <url-pattern>*.do</url-pattern>
+    </filter-mapping>
+    -->
+
+    <!-- Session cleanup listener - causes NPE on Tomcat restart, disabled - MT 2020/06
+    <listener>
+        <listener-class>com.example.bookstore.listener.SessionCleanupListener</listener-class>
+    </listener>
+    -->
+    <!-- Application lifecycle listener - added for BOOK-445, disabled because of
+         ClassNotFoundException in staging env - HN 2021/02
+    <listener>
+        <listener-class>com.example.bookstore.listener.AppLifecycleListener</listener-class>
+    </listener>
+    -->
+
+    <servlet>
+        <servlet-name>action</servlet-name>
+        <servlet-class>org.apache.struts.action.ActionServlet</servlet-class>
+        <init-param>
+            <param-name>config</param-name>
+            <param-value>/WEB-INF/struts-config.xml</param-value>
+        </init-param>
+            <init-param>
+                <param-name>debug</param-name>
+                <param-value>9</param-value>
+            </init-param>
+        <init-param>
+            <param-name>detail</param-name>
+            <param-value>9</param-value>
+        </init-param>
+        <load-on-startup>2</load-on-startup>
+    </servlet>
+
+    <!-- Health check servlet - HN 2019/08 for Nagios monitoring (BOOK-389)
+         Nobody ever configured Nagios to hit this endpoint -->
+    <servlet>
+        <servlet-name>HealthCheckServlet</servlet-name>
+        <servlet-class>com.example.bookstore.servlet.HealthCheckServlet</servlet-class>
+        <load-on-startup>3</load-on-startup>
+    </servlet>
+
+    <servlet-mapping>
+        <servlet-name>action</servlet-name>
+        <url-pattern>*.do</url-pattern>
+    </servlet-mapping>
+    <!-- Legacy URL pattern - kept for backward compatibility - SK 2017/03 -->
+	<servlet-mapping>
+		<servlet-name>action</servlet-name>
+		<url-pattern>*.action</url-pattern>
+	</servlet-mapping>
+    <!-- Old REST-style mapping attempt - never fully implemented - MT 2020/01
+         See BOOK-289 for details -->
+    <servlet-mapping>
+      <servlet-name>action</servlet-name>
+      <url-pattern>/api/v1/*</url-pattern>
+    </servlet-mapping>
+
+    <!-- Health check endpoint mapping - HN 2019/08 -->
+    <servlet-mapping>
+        <servlet-name>HealthCheckServlet</servlet-name>
+        <url-pattern>/health</url-pattern>
+    </servlet-mapping>
+
+    <session-config>
+        <session-timeout>60</session-timeout>
+    </session-config>
+
+    <welcome-file-list>
+        <welcome-file>index.jsp</welcome-file>
+    </welcome-file-list>
+
+    <!-- Error pages - updated by HN 2018/07 -->
+    <error-page>
+        <error-code>404</error-code>
+        <location>/error.jsp</location>
+    </error-page>
+    <!-- Changed 404 to point to new error page - MT 2020/09
+         NOTE: Not sure if Tomcat uses the first or last definition -->
+    <error-page>
+        <error-code>404</error-code>
+        <location>/WEB-INF/jsp/bookstore/error.jsp</location>
+    </error-page>
+    <error-page>
+        <error-code>500</error-code>
+        <location>/error.jsp</location>
+    </error-page>
+    <!-- Custom 500 page with stack trace display - DISABLED in production - SK 2019/06
+    <error-page>
+        <error-code>500</error-code>
+        <location>/WEB-INF/jsp/debug/error500.jsp</location>
+    </error-page>
+    -->
+	<error-page>
+		<error-code>403</error-code>
+		<location>/error.jsp</location>
+	</error-page>
+
+    <taglib>
+        <taglib-uri>http://struts.apache.org/tags-html</taglib-uri>
+        <taglib-location>/WEB-INF/struts-html.tld</taglib-location>
+    </taglib>
+	<taglib>
+		<taglib-uri>http://struts.apache.org/tags-bean</taglib-uri>
+		<taglib-location>/WEB-INF/struts-bean.tld</taglib-location>
+	</taglib>
+    <taglib>
+        <taglib-uri>http://struts.apache.org/tags-logic</taglib-uri>
+        <taglib-location>/WEB-INF/struts-logic.tld</taglib-location>
+    </taglib>
+    <taglib>
+      <taglib-uri>http://struts.apache.org/tags-nested</taglib-uri>
+      <taglib-location>/WEB-INF/struts-nested.tld</taglib-location>
+    </taglib>
+
+    <!-- Security constraints
+         NOTE: Disabled because it conflicts with Struts form-based auth
+         FIXME: This means /admin/* is accessible without login via direct URL!
+    <security-constraint>
+        <web-resource-collection>
+            <web-resource-name>Admin Area</web-resource-name>
+            <url-pattern>/admin/*</url-pattern>
+        </web-resource-collection>
+        <auth-constraint>
+            <role-name>ADMIN</role-name>
+        </auth-constraint>
+    </security-constraint>
+    -->
+
+    <!-- API security - added for REST endpoints (BOOK-334) - HN 2019/11
+         DISABLED: returns 403 for all API calls, need to investigate
+    <security-constraint>
+        <web-resource-collection>
+            <web-resource-name>API Endpoints</web-resource-name>
+            <url-pattern>/api/*</url-pattern>
+            <http-method>PUT</http-method>
+            <http-method>DELETE</http-method>
+        </web-resource-collection>
+        <auth-constraint>
+            <role-name>API_USER</role-name>
+        </auth-constraint>
+    </security-constraint>
+    -->
+
+    <!-- Restrict direct JSP access - BOOK-412 - SK 2020/02
+         Commented out: broke all Struts forwards, need to exclude /WEB-INF/
+    <security-constraint>
+        <web-resource-collection>
+            <web-resource-name>Block Direct JSP</web-resource-name>
+            <url-pattern>*.jsp</url-pattern>
+        </web-resource-collection>
+        <auth-constraint />
+    </security-constraint>
+    -->
+
+    <!-- SSL constraint for checkout pages - BOOK-501 - MT 2021/01
+         NOTE: Our load balancer terminates SSL so this doesn't work as expected
+    <security-constraint>
+        <web-resource-collection>
+            <web-resource-name>Checkout SSL</web-resource-name>
+            <url-pattern>/checkout/*</url-pattern>
+        </web-resource-collection>
+        <user-data-constraint>
+            <transport-guarantee>CONFIDENTIAL</transport-guarantee>
+        </user-data-constraint>
+    </security-constraint>
+    -->
+
+</web-app>

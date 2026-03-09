@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE hibernate-mapping PUBLIC
+    "-//Hibernate/Hibernate Mapping DTD 3.0//EN"
+    "http://hibernate.sourceforge.net/hibernate-mapping-3.0.dtd">
+
+<hibernate-mapping package="com.example.bookstore.model">
+    <class name="User" table="users">
+        <id name="id" column="id">
+            <generator class="native"/>
+        </id>
+
+        <property name="usrNm" column="usr_nm" type="string" length="50"/>
+        <property name="pwdHash" column="pwd_hash" type="string" length="128"/>
+        <property name="salt" column="salt" type="string" length="64"/>
+        <property name="role" column="role" type="string" length="20"/>
+        <property name="activeFlg" column="active_flg" type="string" length="1"/>
+        <property name="crtDt" column="crt_dt" type="string" length="8"/>
+        <property name="updDt" column="upd_dt" type="string" length="8"/>
+    </class>
+</hibernate-mapping>

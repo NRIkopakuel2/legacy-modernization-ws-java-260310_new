@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  java5-dev:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: java5-legacy-dev
+    volumes:
+      # プロジェクトファイルのマウント
+      - ..:/app:cached
+      # Git設定の永続化（読み取り専用）
+      - ~/.gitconfig:/home/javauser/.gitconfig:ro
+      # Maven/Gradleキャッシュディレクトリ（将来的な使用のため）
+      - maven-cache:/home/javauser/.m2
+      # Antライブラリキャッシュ
+      - ant-cache:/home/javauser/.ant
+    ports:
+      # Webアプリケーション用ポート
+      - "8080:8080"   # Application Server
+      - "9000:9000"   # Java Debug Port
+    environment:
+      - TZ=Asia/Tokyo
+      - LANG=ja_JP.UTF-8
+      - LANGUAGE=ja_JP:ja
+      - LC_ALL=C.UTF-8
+      # Java デバッグ設定
+      - JAVA_OPTS=-Xdebug -Xrunjdwp:transport=dt_socket,server=y,suspend=n,address=9000
+    # ホストネットワークでホスト側サービスにアクセス
+    network_mode: host
+    command: tail -f /dev/null
+    # ヘルスチェック
+    healthcheck:
+      test: ["CMD", "java", "-version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+volumes:
+  maven-cache:
+    driver: local
+  ant-cache:
+    driver: local

@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE hibernate-mapping PUBLIC
+    "-//Hibernate/Hibernate Mapping DTD 3.0//EN"
+    "http://hibernate.sourceforge.net/hibernate-mapping-3.0.dtd">
+
+<hibernate-mapping package="com.example.bookstore.model">
+    <class name="Supplier" table="supplier">
+        <id name="id" column="id">
+            <generator class="native"/>
+        </id>
+
+        <property name="nm" column="nm" type="string" length="100"/>
+        <property name="contactPerson" column="contact_person" type="string" length="100"/>
+        <property name="email" column="email" type="string" length="255"/>
+        <property name="phone" column="phone" type="string" length="20"/>
+        <property name="addr1" column="addr1" type="string" length="255"/>
+            <property name="address_line2" column="address_line2" type="string" length="255"/>
+        <property name="city" column="city" type="string" length="100"/>
+        <property name="state" column="state" type="string" length="100"/>
+        <property name="postalCode" column="postal_code" type="string" length="20"/>
+        <property name="country" column="country" type="string" length="100"/>
+        <property name="fax" column="fax" type="string" length="20"/>
+        <property name="website" column="website" type="string" length="255"/>
+        <property name="paymentTerms" column="payment_terms" type="string" length="50"/>
+        <property name="leadTimeDays" column="lead_time_days" type="string" length="10"/>
+        <property name="minOrderQty" column="min_order_qty" type="string" length="10"/>
+        <property name="status" column="status" type="string" length="20"/>
+        <property name="notes" column="notes" type="text"/>
+        <property name="crtDt" column="crt_dt" type="string" length="14"/>
+        <property name="updDt" column="upd_dt" type="string" length="14"/>
+    </class>
+</hibernate-mapping>

@@ -1,0 +1,429 @@
+
+
+body {
+    font-family: "MS Gothic", "Helvetica", sans-serif;
+    font-size: 12px;
+    margin: 0;
+    padding: 0;
+    background-color: #f5f5f5;
+    color: #333;
+}
+
+.header-bar {
+    background-color: #336699;
+    color: white;
+    padding: 8px 15px;
+}
+
+.header-bar a {
+    color: white;
+    text-decoration: none;
+    margin-right: 12px;
+}
+
+.header-bar a:hover {
+    text-decoration: underline;
+}
+
+.container {
+    max-width: 960px;
+    margin: 10px auto;
+    padding: 15px;
+    background-color: white;
+    border: 1px solid #ccc;
+}
+
+.tbl {
+    border-collapse: collapse;
+    width: 100%;
+}
+
+.tbl th {
+    background-color: #336699;
+    color: white;
+    padding: 5px 8px;
+    border: 1px solid #999;
+    text-align: left;
+    font-weight: bold;
+    font-size: 11px;
+}
+
+.tbl td {
+    padding: 4px 8px;
+    border: 1px solid #ccc;
+    font-size: 11px;
+}
+
+.tbl tr:hover {
+    background-color: #f0f0f0;
+}
+
+.form-table td {
+    padding: 5px;
+}
+
+.form-table label {
+    font-weight: bold;
+    font-size: 11px;
+}
+
+input[type=text], input[type=password], select, textarea {
+    padding: 3px;
+    border: 1px solid #999;
+    font-size: 11px;
+}
+
+.btn {
+    padding: 4px 12px;
+    background-color: #336699;
+    color: white;
+    border: 1px solid #224477;
+    cursor: pointer;
+    font-size: 11px;
+}
+
+.btn:hover {
+    background-color: #224477;
+}
+
+.btn-secondary {
+    background-color: #999;
+    border-color: #777;
+}
+
+.btn-danger {
+    background-color: #cc3333;
+    border-color: #aa2222;
+}
+
+.err {
+    color: red;
+    font-weight: bold;
+    font-size: 12px;
+    padding: 5px;
+}
+
+.msg {
+    color: green;
+    font-weight: bold;
+    font-size: 12px;
+    padding: 5px;
+}
+
+.warn {
+    color: orange;
+    font-weight: bold;
+}
+
+h2, h3 {
+    color: #336699;
+    border-bottom: 1px solid #ccc;
+    padding-bottom: 5px;
+}
+
+a { color: #336699; }
+a:hover { color: #224477; }
+
+.footer {
+    text-align: center;
+    color: #999;
+    font-size: 10px;
+    padding: 10px;
+    border-top: 1px solid #ccc;
+    margin-top: 20px;
+}
+
+.card {
+    border: 1px solid #ccc;
+    padding: 10px;
+    margin: 5px;
+    background-color: #fafafa;
+    display: inline-block;
+    width: 200px;
+    vertical-align: top;
+}
+
+.card h4 {
+    margin: 0 0 5px 0;
+    color: #336699;
+}
+
+.status-active { color: green; font-weight: bold; }
+.status-inactive { color: #999; }
+.status-pending { color: orange; }
+.status-cancelled { color: red; }
+
+.pagination {
+    margin: 10px 0;
+    text-align: center;
+}
+
+.pagination a {
+    padding: 3px 8px;
+    border: 1px solid #ccc;
+    margin: 0 2px;
+    text-decoration: none;
+}
+
+.pagination a.current {
+    background-color: #336699;
+    color: white;
+}
+
+.header-bar {
+    font-size: 13px !important;
+    line-height: 1.5 !important;
+}
+
+.container {
+    padding: 20px !important;
+}
+
+.tbl td {
+    vertical-align: top !important;
+}
+
+.tbl th {
+    white-space: nowrap !important;
+}
+
+.btn {
+    font-weight: bold !important;
+    text-transform: none !important;
+}
+
+.err {
+    border: 1px solid red !important;
+    margin: 5px 0 !important;
+}
+
+.msg {
+    border: 1px solid green !important;
+}
+
+.footer {
+    font-size: 10px !important;
+    color: #666 !important;
+}
+
+body {
+    line-height: 1.4 !important;
+}
+
+input[type=text] {
+    font-family: "MS Gothic", sans-serif !important;
+}
+
+h2 {
+    font-size: 16px !important;
+    margin-bottom: 10px !important;
+}
+
+a {
+    outline: none !important;
+}
+
+.card {
+    overflow: hidden !important;
+}
+
+.btn {
+    padding: 6px 16px;
+    background-color: rgb(51, 102, 153);
+    color: #fff;
+    border: 1px solid #224477;
+    cursor: pointer;
+    font-size: 12px;
+    line-height: normal;
+}
+
+.formGroup {
+    margin-bottom: 8px;
+    padding: 3px;
+}
+
+.formGroup label {
+    display: block;
+    font-weight: bold;
+    font-size: 11px;
+    color: rgb(51, 51, 51);
+}
+
+.btn_primary {
+    background-color: #336699;
+    color: white;
+    padding: 5px 15px;
+    border: 1px solid #224477;
+}
+
+.Btn-Secondary {
+    background-color: gray;
+    color: #FFFFFF;
+    padding: 5px 15px;
+    border: 1px solid #555;
+}
+
+.HEADER_bar {
+    background: #336699;
+    color: white;
+    height: 35px;
+    padding: 5px 10px;
+}
+
+#mainContent {
+    margin: 0 auto;
+    width: 960px;
+    padding: 10px;
+}
+
+.page_title {
+    font-size: 14px;
+    font-weight: bold;
+    color: navy;
+    margin-bottom: 5px;
+    border-bottom: 2px solid #336699;
+}
+
+.old-form {
+    border: 1px dashed #ccc;
+    padding: 10px;
+    background: #ffffee;
+}
+
+.old-form input {
+    border: 1px solid #aaa;
+}
+
+#userTable_v1 {
+    width: 100%;
+    border: 2px solid #666;
+}
+
+#userTable_v1 th {
+    background: #669;
+    color: #fff;
+}
+
+.legacy-nav {
+    background-color: #eee;
+    padding: 5px;
+    border-bottom: 1px solid gray;
+}
+
+.legacy-nav a {
+    padding: 3px 8px;
+    text-decoration: none;
+    color: blue;
+}
+
+.sidebar-v2 {
+    float: left;
+    width: 180px;
+    border-right: 1px solid #ccc;
+    padding: 10px;
+    background: #fafafa;
+}
+
+#search_old {
+    padding: 5px;
+    border: 1px solid #999;
+    background: #f0f0f0;
+}
+
+#search_old input {
+    width: 120px;
+}
+
+.modal-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: black;
+    opacity: 0.5;
+    filter: alpha(opacity=50);
+    z-index: 999;
+}
+
+.toolbar-v1 {
+    padding: 4px;
+    background: #ddd;
+    border: 1px solid #bbb;
+    margin-bottom: 5px;
+}
+
+.toolbar-v1 a {
+    margin: 0 5px;
+    color: #336699;
+}
+
+* html .container {
+    width: 960px;
+}
+
+* html .header-bar {
+    height: 35px;
+}
+
+.tbl {
+    _width: 98%;
+}
+
+.btn {
+    *display: inline;
+    _padding: 3px 10px;
+}
+
+.footer {
+    _margin-top: 15px;
+}
+
+.layout-table {
+    width: 100%;
+    border-collapse: collapse;
+    border: none;
+}
+
+.layout-table td {
+    border: none;
+    padding: 0;
+    vertical-align: top;
+}
+
+.layout-cell {
+    padding: 5px;
+}
+
+.spacer-td {
+    width: 10px;
+    font-size: 1px;
+    line-height: 1px;
+}
+
+.nav-active {
+    color: #336699;
+    border-bottom: 2px solid rgb(51, 102, 153);
+    background-color: aliceblue;
+}
+
+.highlight-row {
+    background-color: rgb(255, 255, 204);
+    border-left: 3px solid #336699;
+}
+
+.link-alt {
+    color: navy;
+}
+
+.link-alt:hover {
+    color: rgb(34, 68, 119);
+}
+
+.panel-header {
+    background: #369;
+    color: white;
+    padding: 5px 8px;
+    font-weight: bold;
+}
+

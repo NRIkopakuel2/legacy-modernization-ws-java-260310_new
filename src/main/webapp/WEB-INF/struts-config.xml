@@ -1,0 +1,641 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE struts-config PUBLIC
+    "-//Apache Software Foundation//DTD Struts Configuration 1.3//EN"
+    "http://struts.apache.org/dtds/struts-config_1_3.dtd">
+
+<struts-config>
+
+    
+    
+    
+    
+    <!-- FIXME: BOOK-112 - consolidate form-bean naming convention (camelCase vs underscore) -->
+    <!-- NOTE: Some old JSPs still reference the underscore names. Do NOT remove until
+         all JSPs are migrated to the new naming convention. - SK 2017/08 -->
+    <form-beans>
+        <!-- Old form definition - DO NOT USE, kept for reference - SK 2017/08
+        <form-bean name="login_form" type="com.example.bookstore.form.LoginForm"/>
+        <form-bean name="loginFrm" type="com.example.bookstore.form.LoginForm"/>
+        <form-bean name="book_search_form" type="com.example.bookstore.form.BookSearchForm"/>
+        -->
+
+        <!-- TODO: BOOK-221 - merge loginForm and userProfileForm into single AuthForm
+             Attempted in sprint 14 but rolled back - TK 2018/05 -->
+        <form-bean name="loginForm"
+                   type="com.example.bookstore.form.LoginForm"/>
+
+        <!-- Previous name was "searchBookForm", changed for consistency - SK 2017/09
+        <form-bean name="searchBookForm" type="com.example.bookstore.form.BookSearchForm"/>
+        <form-bean name="bookSearchFrm" type="com.example.bookstore.form.BookSearchForm"/>
+        -->
+        <form-bean name="bookSearchForm"
+            type="com.example.bookstore.form.BookSearchForm"/>
+
+        <!-- Original sales form used DynaActionForm - migrated to concrete class - MT 2018/02
+        <form-bean name="salesActionForm"
+                   type="org.apache.struts.action.DynaActionForm">
+            <form-property name="bookId" type="java.lang.String"/>
+            <form-property name="quantity" type="java.lang.Integer" initial="1"/>
+            <form-property name="customerId" type="java.lang.String"/>
+        </form-bean>
+        <form-bean name="sales_form" type="com.example.bookstore.form.SalesForm"/>
+        -->
+        <form-bean name="salesForm"
+                   type="com.example.bookstore.form.SalesForm"/>
+
+	    <form-bean name="stockAdjustmentForm"
+		           type="com.example.bookstore.form.StockAdjustmentForm"/>
+        <!-- FIXME: BOOK-334 - stockAdjustmentForm should extend InventoryBaseForm
+             Old mapping kept for rollback - YT 2019/03
+        <form-bean name="stock_adj_form" type="com.example.bookstore.form.StockAdjustmentForm"/>
+        <form-bean name="inventoryAdjForm" type="com.example.bookstore.form.InventoryAdjustmentForm"/>
+        -->
+
+        <form-bean name="reportFilterForm"
+                   type="com.example.bookstore.form.ReportFilterForm"/>
+            <form-bean name="auditLogFilterForm"
+                       type="com.example.bookstore.form.AuditLogFilterForm"/>
+        <form-bean name="adminForm"
+                   type="com.example.bookstore.form.AdminForm"/>
+
+        <!-- TODO: BOOK-567 - add customerRegistrationForm once CustomerAction is ready
+        <form-bean name="customerForm" type="com.example.bookstore.form.CustomerForm"/>
+        <form-bean name="custRegForm" type="com.example.bookstore.form.CustomerRegistrationForm"/>
+        -->
+
+        <!-- BOOK-890 - planned supplier management forms, never implemented - TK 2020/01
+        <form-bean name="supplierForm" type="com.example.bookstore.form.SupplierForm"/>
+        <form-bean name="purchaseOrderForm" type="com.example.bookstore.form.PurchaseOrderForm"/>
+        -->
+
+        
+        
+    </form-beans>
+
+    
+    
+    
+    <!-- Global exceptions - DISABLED after upgrading to Struts 1.3 - YT 2018/11
+         FIXME: BOOK-178 exception handler classes were removed during the DAO refactor
+         but nobody updated this config. Re-enable after creating new handler classes.
+         See also: ApplicationExceptionHandler was split into separate handlers per module
+    <global-exceptions>
+        <exception key="error.general"
+                   type="java.lang.Exception"
+                   handler="com.example.bookstore.exception.ApplicationExceptionHandler"
+                   path="/WEB-INF/jsp/bookstore/error.jsp"/>
+        <exception key="error.database"
+                   type="java.sql.SQLException"
+                   handler="com.example.bookstore.exception.DatabaseExceptionHandler"
+                   path="/WEB-INF/jsp/bookstore/db-error.jsp"/>
+        <exception key="error.security"
+                   type="com.example.bookstore.exception.SecurityException"
+                   handler="com.example.bookstore.exception.SecurityExceptionHandler"
+                   path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+    </global-exceptions>
+    -->
+
+    <!-- TODO: BOOK-201 - add global-forwards for common navigation targets
+         Was discussed in sprint 8 retro but never prioritized - SK 2018/03
+    <global-forwards>
+        <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+        <forward name="error" path="/WEB-INF/jsp/bookstore/error.jsp"/>
+        <forward name="home" path="/home.do"/>
+        <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+    </global-forwards>
+    -->
+
+    <action-mappings>
+
+        
+        
+        
+
+        <!-- FIXME: validate="true" causes issues with AJAX calls - TK 2020/01 -->
+        <!-- TODO: add CSRF token validation filter - BOOK-456 -->
+        <!-- NOTE: parameter="method" is required for DispatchAction subclasses -->
+        <!-- WARNING: Do not change action order - Struts processes first match (is this true?) - MT 2019/02 -->
+
+        <action path="/login"
+                type="com.example.bookstore.action.LoginAction"
+                name="loginForm"
+                scope="session"
+                parameter="method"
+                validate="true"
+                input="/WEB-INF/jsp/bookstore/login.jsp">
+            <forward name="success" path="/home.do"/>
+            <forward name="success2" path="/WEB-INF/jsp/bookstore/welcome.jsp"/>
+            <forward name="failure" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+            <forward name="error" path="/WEB-INF/jsp/bookstore/error.jsp"/>
+        </action>
+
+        <action path="/logout"
+                type="com.example.bookstore.action.LoginAction"
+                parameter="method"
+                validate="false">
+            <forward name="success" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+        </action>
+
+        
+        
+        
+
+        <!-- Validation enabled for security compliance - TK 2019/01 -->
+        <action path="/home"
+                type="com.example.bookstore.action.HomeAction"
+                validate="false">
+            <forward name="success" path="/WEB-INF/jsp/bookstore/home.jsp"/>
+            <!-- FIXME: BOOK-301 - relative path below was used in Tomcat 5.5 deployment
+                 Switched to absolute path after migration to Tomcat 7 - SK 2018/06
+            <forward name="success" path="../bookstore/home.jsp"/>
+            -->
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+            <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+        </action>
+
+        
+        
+        
+
+	    <action path="/book/search"
+		        type="com.example.bookstore.action.BookAction"
+		        name="bookSearchForm"
+		        scope="session"
+		        validate="false">
+		    <forward name="success" path="/WEB-INF/jsp/bookstore/book/search.jsp"/>
+		    <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+		    <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+	    </action>
+
+        
+        
+        
+
+        <!-- TODO: BOOK-412 - split SalesAction into SalesEntryAction and SalesCartAction
+             This action is doing too much, but refactor keeps getting deprioritized - MT 2019/11 -->
+        <!-- Validation enabled per PCI compliance requirement - SK 2019/06 -->
+        <action path="/sales/entry"
+                type="com.example.bookstore.action.SalesAction"
+                name="salesForm"
+                scope="session"
+                parameter="method"
+                validate="false">
+            <forward name="success" path="/WEB-INF/jsp/bookstore/sales/entry.jsp"/>
+            <!-- Old relative path - DO NOT USE, breaks when context path changes - TK 2018/09
+            <forward name="success" path="../bookstore/sales/entry.jsp"/>
+            -->
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+            <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+        </action>
+
+        <action path="/sales/cart/add"
+                type="com.example.bookstore.action.SalesAction"
+                name="salesForm"
+                scope="session"
+                parameter="method"
+                validate="false">
+            <forward name="success" path="/sales/entry.do" redirect="true"/>
+            <forward name="successNew" path="/WEB-INF/jsp/bookstore/sales/entry.jsp"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+            <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+        </action>
+
+        <action path="/sales/cart/update"
+            type="com.example.bookstore.action.SalesAction"
+            name="salesForm"
+            scope="session"
+            parameter="method"
+            validate="false">
+            <forward name="success" path="/sales/entry.do" redirect="true"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+        </action>
+
+        <action path="/sales/cart/remove"
+                type="com.example.bookstore.action.SalesAction"
+                name="salesForm"
+                scope="session"
+                parameter="method"
+                validate="false">
+            <forward name="success" path="/sales/entry.do" redirect="true"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+            <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+        </action>
+
+        <action path="/sales/checkout"
+                type="com.example.bookstore.action.SalesAction"
+                name="salesForm"
+                scope="session"
+                parameter="method"
+                validate="false">
+            <forward name="success" path="/WEB-INF/jsp/bookstore/sales/checkout.jsp"/>
+            <forward name="successEdit" path="/WEB-INF/jsp/bookstore/sales/entry.jsp"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+            <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+            <forward name="error" path="/WEB-INF/jsp/bookstore/error.jsp"/>
+        </action>
+
+        <action path="/sales/checkout/submit"
+                type="com.example.bookstore.action.SalesAction"
+                name="salesForm"
+                scope="session"
+                parameter="method"
+                validate="true">
+            <forward name="success" path="/WEB-INF/jsp/bookstore/sales/confirmation.jsp"/>
+            <forward name="success2" path="/WEB-INF/jsp/bookstore/sales/checkout.jsp"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+            <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+            <forward name="error" path="/WEB-INF/jsp/bookstore/error.jsp"/>
+        </action>
+
+        
+
+        
+        
+        
+
+        <!-- FIXME: BOOK-389 - InventoryAction needs role-based access control
+             Currently anyone with a session can access inventory pages - YT 2019/09 -->
+        <!-- Validation enabled for inventory operations - MT 2019/08 -->
+        <action path="/inventory/list"
+                type="com.example.bookstore.action.InventoryAction"
+                scope="session"
+                parameter="method"
+                validate="false">
+            <forward name="success" path="/WEB-INF/jsp/bookstore/inventory/list.jsp"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+        </action>
+
+        <action path="/inventory/detail"
+                type="com.example.bookstore.action.InventoryAction"
+                scope="session"
+                parameter="method"
+                validate="false">
+            <forward name="success" path="/WEB-INF/jsp/bookstore/inventory/detail.jsp"/>
+            <forward name="successNew" path="/WEB-INF/jsp/bookstore/inventory/list.jsp"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+        </action>
+
+        <action path="/inventory/adjust"
+                type="com.example.bookstore.action.InventoryAction"
+                name="stockAdjustmentForm"
+                scope="session"
+                parameter="method"
+                validate="true"
+                input="/WEB-INF/jsp/bookstore/inventory/adjust.jsp">
+            <forward name="success" path="/WEB-INF/jsp/bookstore/inventory/adjust.jsp"/>
+            <forward name="successEdit" path="/WEB-INF/jsp/bookstore/inventory/detail.jsp"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+            <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+        </action>
+
+        <action path="/inventory/ledger"
+            type="com.example.bookstore.action.InventoryAction"
+            scope="session"
+            parameter="method"
+            validate="false">
+            <forward name="success" path="/WEB-INF/jsp/bookstore/inventory/ledger.jsp"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+        </action>
+
+        <action path="/inventory/lowstock"
+                type="com.example.bookstore.action.InventoryAction"
+                scope="session"
+                parameter="method"
+                validate="false">
+            <forward name="success" path="/WEB-INF/jsp/bookstore/inventory/lowstock.jsp"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+        </action>
+
+        
+
+        
+        
+        
+
+        <action path="/supplier/list"
+                type="com.example.bookstore.action.PurchaseOrderAction"
+                parameter="method"
+                validate="false">
+            <forward name="success" path="/WEB-INF/jsp/bookstore/supplier/list.jsp"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+            <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+        </action>
+
+        <action path="/purchaseorder/list"
+                type="com.example.bookstore.action.PurchaseOrderAction"
+                parameter="method"
+                validate="false">
+            <forward name="success" path="/WEB-INF/jsp/bookstore/purchaseorder/list.jsp"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+            <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+        </action>
+
+        
+        
+        
+
+        <action path="/reports"
+                type="com.example.bookstore.action.ReportAction"
+                name="reportFilterForm"
+                scope="session"
+                parameter="method"
+                validate="false">
+            <forward name="success" path="/WEB-INF/jsp/bookstore/reports/menu.jsp"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+            <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+        </action>
+
+        <action path="/reports/daily"
+                type="com.example.bookstore.action.ReportAction"
+                name="reportFilterForm"
+                scope="session"
+                parameter="method"
+                validate="false">
+            <forward name="success" path="/WEB-INF/jsp/bookstore/reports/daily-sales.jsp"/>
+            <forward name="success2" path="/WEB-INF/jsp/bookstore/reports/menu.jsp"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+            <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+            <forward name="error" path="/WEB-INF/jsp/bookstore/error.jsp"/>
+        </action>
+
+        <action path="/reports/bybook"
+            type="com.example.bookstore.action.ReportAction"
+            name="reportFilterForm"
+            scope="session"
+            parameter="method"
+            validate="false">
+            <forward name="success" path="/WEB-INF/jsp/bookstore/reports/sales-by-book.jsp"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+            <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+        </action>
+
+        <action path="/reports/topbooks"
+                type="com.example.bookstore.action.ReportAction"
+                name="reportFilterForm"
+                scope="session"
+                parameter="method"
+                validate="false">
+            <forward name="success" path="/WEB-INF/jsp/bookstore/reports/top-books.jsp"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+            <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+        </action>
+
+        <action path="/export/csv"
+                type="com.example.bookstore.action.ReportAction"
+                name="reportFilterForm"
+                scope="session"
+                parameter="method"
+                validate="false">
+            
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+            <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+            <forward name="error" path="/WEB-INF/jsp/bookstore/error.jsp"/>
+        </action>
+
+        
+        
+        
+
+        <action path="/audit/log"
+                type="com.example.bookstore.action.AuditLogAction"
+                name="auditLogFilterForm"
+                scope="session"
+                validate="false">
+            <forward name="success" path="/WEB-INF/jsp/bookstore/audit/log.jsp"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+            <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+        </action>
+
+        
+
+        
+        
+        
+
+        <action path="/admin/home"
+                type="com.example.bookstore.action.AdminAction"
+                parameter="method"
+                validate="false">
+            <forward name="success" path="/WEB-INF/jsp/bookstore/admin/home.jsp"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+            <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+        </action>
+
+        
+        <action path="/admin/user/list"
+                type="com.example.bookstore.action.AdminAction"
+                parameter="method"
+                validate="false">
+            <forward name="success" path="/WEB-INF/jsp/bookstore/admin/user/list.jsp"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+            <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+        </action>
+
+        <action path="/admin/user/form"
+                type="com.example.bookstore.action.AdminAction"
+                name="adminForm"
+                scope="session"
+                parameter="method"
+                validate="false">
+            <forward name="success" path="/WEB-INF/jsp/bookstore/admin/user/form.jsp"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+            <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+        </action>
+
+        <!-- Validation enabled for security - TK 2019/01 -->
+        <action path="/admin/user/save"
+                type="com.example.bookstore.action.AdminAction"
+                name="adminForm"
+                scope="session"
+                parameter="method"
+                validate="false">
+            <forward name="success" path="/admin/user/list.do" redirect="true"/>
+            <forward name="successEdit" path="/WEB-INF/jsp/bookstore/admin/user/form.jsp"/>
+            <!-- Old relative forward - caused 404 in production - SK 2018/07
+            <forward name="successEdit" path="../bookstore/admin/user/form.jsp"/>
+            -->
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+            <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+        </action>
+
+        <action path="/admin/user/toggleActive"
+                type="com.example.bookstore.action.AdminAction"
+                parameter="method"
+                validate="false">
+            <forward name="success" path="/admin/user/list.do" redirect="true"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+            <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+        </action>
+
+        
+        <action path="/admin/category/list"
+                type="com.example.bookstore.action.AdminAction"
+                parameter="method"
+                validate="false">
+            <forward name="success" path="/WEB-INF/jsp/bookstore/admin/category/list.jsp"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+            <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+        </action>
+
+        <action path="/admin/category/form"
+                type="com.example.bookstore.action.AdminAction"
+                name="adminForm"
+                scope="session"
+                parameter="method"
+                validate="false">
+            <forward name="success" path="/WEB-INF/jsp/bookstore/admin/category/form.jsp"/>
+            <forward name="successNew" path="/WEB-INF/jsp/bookstore/admin/category/list.jsp"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+            <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+        </action>
+
+            <action path="/admin/category/save"
+                    type="com.example.bookstore.action.AdminAction"
+                    name="adminForm"
+                    scope="session"
+                    parameter="method"
+                    validate="true">
+                <forward name="success" path="/admin/category/list.do" redirect="true"/>
+                <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+                <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+            </action>
+
+        <action path="/admin/category/delete"
+                type="com.example.bookstore.action.AdminAction"
+                parameter="method"
+                validate="false">
+            <forward name="success" path="/admin/category/list.do" redirect="true"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+            <forward name="unauthorized" path="/WEB-INF/jsp/bookstore/unauthorized.jsp"/>
+        </action>
+
+        <!-- Planned features - not yet implemented
+        TODO: Add customer registration - BOOK-567
+        <action path="/customer/register"
+                type="com.example.bookstore.action.CustomerAction"
+                name="customerForm"
+                scope="session"
+                parameter="method"
+                validate="true">
+            <forward name="success" path="/WEB-INF/jsp/bookstore/customer/register.jsp"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+        </action>
+        -->
+
+        <!-- DISABLED: causes session conflicts with /sales/entry
+        <action path="/cart/view"
+                type="com.example.bookstore.action.SalesAction"
+                parameter="method"
+                validate="false">
+            <forward name="success" path="/WEB-INF/jsp/bookstore/sales/cart.jsp"/>
+        </action>
+        -->
+
+        <!-- Reporting action - removed in BOOK-234 refactor, keeping mapping just in case - MT 2019/04
+             CustomReportAction was merged into ReportAction but this mapping used different
+             parameter conventions. Restore if we ever need the old report format back.
+        <action path="/reports/custom"
+                type="com.example.bookstore.action.CustomReportAction"
+                name="reportFilterForm"
+                scope="session"
+                parameter="method"
+                validate="false">
+            <forward name="success" path="/WEB-INF/jsp/bookstore/reports/custom-report.jsp"/>
+            <forward name="export" path="/WEB-INF/jsp/bookstore/reports/custom-export.jsp"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+        </action>
+        -->
+
+        <!-- Bulk import feature - removed in BOOK-456 cleanup - SK 2020/01
+             BulkImportAction had dependency on Apache POI which caused classloader issues
+             in WebSphere. Keeping mapping for when we migrate to Tomcat.
+        <action path="/admin/import/bulk"
+                type="com.example.bookstore.action.BulkImportAction"
+                name="adminForm"
+                scope="session"
+                parameter="method"
+                validate="true"
+                input="/WEB-INF/jsp/bookstore/admin/import/bulk.jsp">
+            <forward name="success" path="/WEB-INF/jsp/bookstore/admin/import/result.jsp"/>
+            <forward name="error" path="/WEB-INF/jsp/bookstore/admin/import/bulk.jsp"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+        </action>
+        -->
+
+        <!-- Email notification action - BOOK-512, disabled after SMTP server decommissioned - YT 2019/07
+             TODO: re-enable once we switch to SendGrid API (BOOK-678)
+        <action path="/notifications/send"
+                type="com.example.bookstore.action.EmailNotificationAction"
+                parameter="method"
+                validate="false">
+            <forward name="success" path="/WEB-INF/jsp/bookstore/notifications/sent.jsp"/>
+            <forward name="failure" path="/WEB-INF/jsp/bookstore/notifications/error.jsp"/>
+        </action>
+        -->
+
+        <!-- Dashboard action - prototype from hackathon, never production ready - TK 2020/03
+             FIXME: BOOK-701 DashboardAction extends deprecated BaseAction, needs migration
+        <action path="/dashboard"
+                type="com.example.bookstore.action.DashboardAction"
+                parameter="method"
+                validate="false">
+            <forward name="success" path="/WEB-INF/jsp/bookstore/dashboard/main.jsp"/>
+            <forward name="login" path="/WEB-INF/jsp/bookstore/login.jsp"/>
+        </action>
+        -->
+
+        <!-- Old admin paths - redirected to new paths in v2.0
+        <action path="/admin/users" forward="/admin/user/list.do"/>
+        <action path="/admin/categories" forward="/admin/category/list.do"/>
+        -->
+
+        <!-- TODO: BOOK-445 - consider adding /error action mapping for global error handling
+             Currently errors fall through to container error page which shows stack traces
+             in production. This has been reported 3 times by QA. - MT 2019/12 -->
+
+        <!-- FIXME: BOOK-723 - all action mappings should specify roles attribute
+             for container-managed security. Currently relying on programmatic
+             checks in each Action class which is error-prone. - YT 2020/04 -->
+
+    </action-mappings>
+
+    
+    <message-resources parameter="ApplicationResources"/>
+
+    <!-- FIXME: BOOK-890 - additional resource bundles were planned but never created
+    <message-resources parameter="ValidationMessages" key="validation"/>
+    <message-resources parameter="ErrorMessages" key="errors"/>
+    -->
+
+    <!-- Validator plugin - DISABLED, causes startup error with Struts 1.3 - YT 2020/02
+         FIXME: BOOK-890 re-enable after upgrading validator commons
+         NOTE: validator-rules.xml was deleted during the Ant-to-Maven migration
+               but validation.xml might still be in the old SVN repo
+         See also: BOOK-891 for custom validator implementation plan
+    <plug-in className="org.apache.struts.validator.ValidatorPlugIn">
+        <set-property property="pathnames"
+                      value="/WEB-INF/validator-rules.xml,/WEB-INF/validation.xml"/>
+    </plug-in>
+    -->
+
+    <!-- Tiles plugin - attempted integration in BOOK-234 but abandoned - SK 2018/10
+         Tiles definitions file was partially created but never completed.
+         The tiles-defs.xml is still in WEB-INF but is incomplete.
+    <plug-in className="org.apache.struts.tiles.TilesPlugin">
+        <set-property property="definitions-config"
+                      value="/WEB-INF/tiles-defs.xml"/>
+        <set-property property="moduleAware" value="true"/>
+    </plug-in>
+    -->
+
+    <!-- TODO: BOOK-902 - evaluate Struts 1.3 chain configuration
+         This was supposed to replace the request processor customization
+         but nobody on the team understood how it worked. - MT 2020/05
+    <plug-in className="org.apache.struts.chain.ComposableRequestProcessor">
+        <set-property property="chainConfig"
+                      value="org/apache/struts/chain/chain-config.xml"/>
+    </plug-in>
+    -->
+
+</struts-config>

@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE hibernate-mapping PUBLIC
+    "-//Hibernate/Hibernate Mapping DTD 3.0//EN"
+    "http://hibernate.sourceforge.net/hibernate-mapping-3.0.dtd">
+
+<hibernate-mapping package="com.example.bookstore.model">
+    <class name="AuditLog" table="audit_log">
+        <id name="id" column="id">
+            <generator class="native"/>
+        </id>
+
+        <property name="actionType" column="action_type" type="string" length="50"/>
+        <property name="userId" column="user_id" type="string" length="20"/>
+        <property name="username" column="username" type="string" length="50"/>
+        <property name="entityType" column="entity_type" type="string" length="50"/>
+        <property name="entityId" column="entity_id" type="string" length="20"/>
+        <property name="actionDetails" column="action_details" type="text"/>
+        <property name="ipAddress" column="ip_address" type="string" length="45"/>
+        <property name="userAgent" column="user_agent" type="string" length="255"/>
+        <property name="crtDt" column="crt_dt" type="string" length="14"/>
+    </class>
+</hibernate-mapping>
