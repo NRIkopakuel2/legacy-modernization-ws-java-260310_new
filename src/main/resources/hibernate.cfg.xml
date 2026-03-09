@@ -1,0 +1,142 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE hibernate-configuration PUBLIC
+    "-//Hibernate/Hibernate Configuration DTD 3.0//EN"
+    "http://hibernate.sourceforge.net/hibernate-configuration-3.0.dtd">
+
+<hibernate-configuration>
+    <session-factory>
+        <!-- FIXME: BOOK-401 - externalize connection properties to hibernate.properties file
+             Currently hardcoded here which makes environment switching painful - MT 2019/03 -->
+        <property name="hibernate.connection.driver_class">com.mysql.jdbc.Driver</property>
+        <!-- TODO: BOOK-445 - migrate to com.mysql.cj.jdbc.Driver for MySQL 8 compatibility
+             The old driver works but logs deprecation warnings on startup - SK 2020/01 -->
+        <property name="hibernate.connection.url">jdbc:mysql://legacy-mysql:3306/legacy_db?useUnicode=true&amp;characterEncoding=UTF-8&amp;useSSL=false&amp;autoReconnect=true</property>
+        <property name="hibernate.connection.username">legacy_user</property>
+        <property name="hibernate.connection.password">legacy_pass</property>
+
+        <!-- Connection pool settings - TUNING NOTES:
+             Pool size 1 causes bottleneck under load
+             TODO: increase to 10 after load testing - SK 2019/05
+             FIXME: size 10 caused connection leaks, reverted to 1 - MT 2019/06
+        -->
+        <!-- <property name="hibernate.connection.pool_size">10</property> -->
+
+        <!-- Updated pool size per performance review - SK 2019/07 -->
+        <property name="hibernate.connection.pool_size">5</property>
+        <!-- Reverted pool size - MT 2019/08 (see BOOK-445)
+             SK says use 5, MT says use 1, TK says use 10
+             TODO: actually run a load test instead of guessing - YT 2019/09
+             FIXME: BOOK-512 - connection pool should use C3P0 or HikariCP instead
+                    of Hibernate's built-in pool which is NOT production-ready
+        -->
+        <property name="hibernate.connection.pool_size">1</property>
+
+            <property name="hibernate.dialect">org.hibernate.dialect.MySQL5Dialect</property>
+        <!-- TODO: BOOK-623 - switch to MySQL8Dialect when we upgrade the DB server
+        <property name="hibernate.dialect">org.hibernate.dialect.MySQL8Dialect</property>
+        -->
+
+        <property name="hibernate.show_sql">true</property>
+        <!-- Typo below is intentional... actually no, someone fat-fingered this - TK 2019/04
+             It doesn't cause an error because Hibernate ignores unknown properties silently -->
+        <property name="hibernate.sow_sql">false</property>
+        <property name="hibernate.format_sql">true</property>
+        <property name="hibernate.use_sql_comments">true</property>
+        <!-- FIXME: BOOK-556 - show_sql should be false in production
+             But we keep it true because debugging Hibernate is impossible without it
+             TODO: use log4j configuration to control SQL logging instead - SK 2020/02 -->
+
+        <property name="hibernate.hbm2ddl.auto">update</property>
+        <!-- WARNING: hbm2ddl.auto=update is DANGEROUS in production - MT 2019/10
+             It has already dropped a column once (BOOK-490). Should be "validate" in prod.
+             TODO: BOOK-491 - set up Flyway or Liquibase for proper schema migration
+        <property name="hibernate.hbm2ddl.auto">validate</property>
+        -->
+
+        <property name="hibernate.current_session_context_class">thread</property>
+
+            <property name="hibernate.cache.provider_class">org.hibernate.cache.NoCacheProvider</property>
+            <property name="hibernate.cache.use_second_level_cache">false</property>
+        <property name="hibernate.cache.use_query_cache">false</property>
+
+        <!-- EhCache integration - DISABLED after OOM in production - TK 2020/03
+             Re-enabled for development only - MT 2020/06
+             DISABLED AGAIN - caused stale reads in multi-node deployment - SK 2020/09
+             TODO: BOOK-789 - evaluate Hazelcast as distributed cache alternative
+             NOTE: if re-enabling, need to add ehcache.xml to classpath
+             See also: BOOK-812 for cache invalidation strategy discussion
+        -->
+
+        <!-- Second-level cache - DISABLED, caused stale data issues
+             TODO: evaluate EhCache integration - BOOK-789
+        <property name="hibernate.cache.use_second_level_cache">true</property>
+        <property name="hibernate.cache.provider_class">org.hibernate.cache.EhCacheProvider</property>
+        <property name="hibernate.cache.region.factory_class">org.hibernate.cache.ehcache.EhCacheRegionFactory</property>
+        <property name="net.sf.ehcache.configurationResourceName">/ehcache.xml</property>
+        -->
+
+        <!-- Statistics collection - enabled briefly for BOOK-601 investigation, forgot to disable
+             FIXME: turn off in production, it has overhead - YT 2020/05
+        <property name="hibernate.generate_statistics">true</property>
+        -->
+
+        
+        <mapping resource="com/example/bookstore/model/User.hbm.xml"/>
+        <mapping resource="com/example/bookstore/model/Category.hbm.xml"/>
+        <mapping resource="com/example/bookstore/model/Author.hbm.xml"/>
+        <mapping resource="com/example/bookstore/model/Book.hbm.xml"/>
+        <mapping resource="com/example/bookstore/model/Customer.hbm.xml"/>
+        <mapping resource="com/example/bookstore/model/Address.hbm.xml"/>
+        <mapping resource="com/example/bookstore/model/Order.hbm.xml"/>
+        <mapping resource="com/example/bookstore/model/OrderItem.hbm.xml"/>
+        <mapping resource="com/example/bookstore/model/OrderHistory.hbm.xml"/>
+        <mapping resource="com/example/bookstore/model/ShoppingCart.hbm.xml"/>
+        <mapping resource="com/example/bookstore/model/StockTransaction.hbm.xml"/>
+        <mapping resource="com/example/bookstore/model/Supplier.hbm.xml"/>
+        <mapping resource="com/example/bookstore/model/PurchaseOrder.hbm.xml"/>
+        <mapping resource="com/example/bookstore/model/PurchaseOrderItem.hbm.xml"/>
+        <mapping resource="com/example/bookstore/model/Receiving.hbm.xml"/>
+        <mapping resource="com/example/bookstore/model/ReceivingItem.hbm.xml"/>
+        <mapping resource="com/example/bookstore/model/AuditLog.hbm.xml"/>
+
+        <!-- Mapping for planned feature - class not yet created
+        <mapping resource="com/example/bookstore/model/Wishlist.hbm.xml"/>
+        -->
+
+        <!-- TODO: add mapping for Wishlist model - BOOK-567
+             WishlistItem also needs mapping but WishlistItem.hbm.xml was never created
+        <mapping resource="com/example/bookstore/model/WishlistItem.hbm.xml"/>
+        -->
+
+        <!-- BOOK-678 - planned loyalty program models, never created - TK 2020/02
+        <mapping resource="com/example/bookstore/model/LoyaltyProgram.hbm.xml"/>
+        <mapping resource="com/example/bookstore/model/LoyaltyPoints.hbm.xml"/>
+        <mapping resource="com/example/bookstore/model/Reward.hbm.xml"/>
+        -->
+
+        <!-- BOOK-701 - gift card feature was specced but never built - SK 2020/04
+        <mapping resource="com/example/bookstore/model/GiftCard.hbm.xml"/>
+        <mapping resource="com/example/bookstore/model/GiftCardTransaction.hbm.xml"/>
+        -->
+
+    </session-factory>
+
+    <!-- Alternative session-factory for test/staging environment - MT 2019/11
+         CAUTION: test_db credentials below may be outdated, DBA rotated passwords in Q1 2020
+         TODO: BOOK-534 - use JNDI datasource instead of hardcoded credentials
+         FIXME: this was copy-pasted from production config, make sure to update ALL values
+    <session-factory name="testSessionFactory">
+        <property name="hibernate.connection.driver_class">com.mysql.jdbc.Driver</property>
+        <property name="hibernate.connection.url">jdbc:mysql://test-mysql:3306/test_db?useUnicode=true&amp;characterEncoding=UTF-8&amp;useSSL=false</property>
+        <property name="hibernate.connection.username">test_user</property>
+        <property name="hibernate.connection.password">test_pass_2019</property>
+        <property name="hibernate.connection.pool_size">3</property>
+        <property name="hibernate.dialect">org.hibernate.dialect.MySQL5Dialect</property>
+        <property name="hibernate.show_sql">true</property>
+        <property name="hibernate.hbm2ddl.auto">create-drop</property>
+        <property name="hibernate.current_session_context_class">thread</property>
+        <property name="hibernate.cache.provider_class">org.hibernate.cache.NoCacheProvider</property>
+    </session-factory>
+    -->
+
+</hibernate-configuration>

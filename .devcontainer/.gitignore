@@ -1,0 +1,28 @@
+# JDK Binary Files
+*.bin
+jdk-*.bin
+jdk-*-linux-*.bin
+
+# Docker build artifacts
+.dockerignore
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+*.class
+*.jar
+*.war
+*.ear
+target/
+build/
+
+# Logs
+*.log

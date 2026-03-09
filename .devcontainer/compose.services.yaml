@@ -1,0 +1,56 @@
+services:
+  # Tomcat 6.0 with JRE 7 for Struts 1.x compatibility
+  tomcat:
+    image: tomcat:6.0-jre7
+    container_name: legacy-tomcat
+    ports:
+      - "8080:8080"
+    volumes:
+      - ../dist:/usr/local/tomcat/webapps
+      - ../config:/usr/local/tomcat/conf/Catalina/localhost
+    environment:
+      - CATALINA_OPTS=-Xms256m -Xmx512m
+      - JAVA_OPTS=-Djava.awt.headless=true
+    networks:
+      - legacy-network
+
+  # MySQL 5.7 for legacy compatibility
+  mysql:
+    image: mysql:5.7
+    container_name: legacy-mysql
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+      - MYSQL_DATABASE=legacy_db
+      - MYSQL_USER=legacy_user
+      - MYSQL_PASSWORD=legacy_pass
+    volumes:
+      - mysql_data:/var/lib/mysql
+      - ../config/mysql:/docker-entrypoint-initdb.d
+    networks:
+      - legacy-network
+
+  # phpMyAdmin for database management
+  phpmyadmin:
+    image: phpmyadmin/phpmyadmin:5.1
+    container_name: legacy-phpmyadmin
+    ports:
+      - "8082:80"
+    environment:
+      - PMA_HOST=mysql
+      - PMA_PORT=3306
+      - PMA_USER=root
+      - PMA_PASSWORD=root
+    depends_on:
+      - mysql
+    networks:
+      - legacy-network
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+
+networks:
+  legacy-network:
+    driver: bridge
