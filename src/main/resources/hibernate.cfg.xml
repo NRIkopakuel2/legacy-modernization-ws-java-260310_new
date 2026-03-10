@@ -7,10 +7,9 @@
     <session-factory>
         <!-- FIXME: BOOK-401 - externalize connection properties to hibernate.properties file
              Currently hardcoded here which makes environment switching painful - MT 2019/03 -->
-        <property name="hibernate.connection.driver_class">com.mysql.jdbc.Driver</property>
-        <!-- TODO: BOOK-445 - migrate to com.mysql.cj.jdbc.Driver for MySQL 8 compatibility
-             The old driver works but logs deprecation warnings on startup - SK 2020/01 -->
-        <property name="hibernate.connection.url">jdbc:mysql://legacy-mysql:3306/legacy_db?useUnicode=true&amp;characterEncoding=UTF-8&amp;useSSL=false&amp;autoReconnect=true</property>
+        <property name="hibernate.connection.driver_class">com.mysql.cj.jdbc.Driver</property>
+        <!-- Updated to MySQL Connector 8.x driver for Java 11+ compatibility -->
+        <property name="hibernate.connection.url">jdbc:mysql://legacy-mysql:3306/legacy_db?useUnicode=true&amp;characterEncoding=UTF-8&amp;useSSL=false&amp;autoReconnect=true&amp;serverTimezone=UTC</property>
         <property name="hibernate.connection.username">legacy_user</property>
         <property name="hibernate.connection.password">legacy_pass</property>
 
@@ -126,8 +125,8 @@
          TODO: BOOK-534 - use JNDI datasource instead of hardcoded credentials
          FIXME: this was copy-pasted from production config, make sure to update ALL values
     <session-factory name="testSessionFactory">
-        <property name="hibernate.connection.driver_class">com.mysql.jdbc.Driver</property>
-        <property name="hibernate.connection.url">jdbc:mysql://test-mysql:3306/test_db?useUnicode=true&amp;characterEncoding=UTF-8&amp;useSSL=false</property>
+        <property name="hibernate.connection.driver_class">com.mysql.cj.jdbc.Driver</property>
+        <property name="hibernate.connection.url">jdbc:mysql://test-mysql:3306/test_db?useUnicode=true&amp;characterEncoding=UTF-8&amp;useSSL=false&amp;serverTimezone=UTC</property>
         <property name="hibernate.connection.username">test_user</property>
         <property name="hibernate.connection.password">test_pass_2019</property>
         <property name="hibernate.connection.pool_size">3</property>

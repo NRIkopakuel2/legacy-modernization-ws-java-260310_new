@@ -110,3 +110,4 @@ core.*
 
 # Config generated at runtime
 .config/
+.claude/
