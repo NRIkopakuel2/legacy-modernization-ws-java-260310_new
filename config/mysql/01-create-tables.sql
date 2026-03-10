@@ -466,18 +466,5 @@ CREATE TABLE IF NOT EXISTS wishlists (
 -- DELIMITER ;
 
 -- ============================================================
--- "Test data" inserts - should NOT be in schema file but here we are
--- WARNING: some of these reference columns that don't exist in all
--- versions of the schema. DO NOT run blindly.
+-- "Test data" inserts removed due to referencing nonexistent columns
 -- ============================================================
-
--- Test promotions (references nonexistent columns in some schema versions)
-INSERT IGNORE INTO promotions (promo_code, description, discount_type, discount_value, min_order_amount, valid_from, valid_to, is_active, applicable_categories, target_audience, campaign_id, crt_dt, upd_dt)
-VALUES ('SUMMER2017', 'Summer sale 10%', 'PERCENT', 10.0, 25.00, '20170601000000', '20170831235959', 'Y', '1,2,3', 'ALL', 'CAMP001', '20170601000000', '20170601000000');
-
--- Test wishlist data (references notify_email which doesn't exist)
-INSERT IGNORE INTO wishlists (customer_id, book_id, priority, added_dt, notify_flag, notify_email, crt_dt)
-VALUES ('1', '1', 'HIGH', '20180715120000', 'Y', 'test@example.com', '20180715120000');
-
-INSERT IGNORE INTO wishlists (customer_id, book_id, priority, added_dt, notify_flag, notify_email, crt_dt)
-VALUES ('2', '3', 'LOW', '20180801000000', 'N', NULL, '20180801000000');

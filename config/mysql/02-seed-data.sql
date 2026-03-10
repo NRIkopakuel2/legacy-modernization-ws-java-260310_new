@@ -189,24 +189,5 @@ INSERT IGNORE INTO stock_transaction (book_id, txn_type, qty_change, qty_after, 
 ('8888', 'ADJUSTMENT', '-5', '0', '99', 'Inventory correction', 'UNKNOWN', '0', '20110601');
 
 -- ============================================================
--- System config backup data (if table exists)
--- These reference columns from the resources/sql version
+-- system_config_bak と migration_log は存在しないため削除
 -- ============================================================
-INSERT IGNORE INTO system_config_bak (config_key, config_value, config_type, module, is_active, crt_dt) VALUES
-('app.version', '1.0.3', 'STRING', 'CORE', 'Y', '20050101'),
-('tax.default.rate', '10.00', 'NUMBER', 'BILLING', 'Y', '20050101'),
-('session.timeout.minutes', '30', 'NUMBER', 'AUTH', 'Y', '20050101'),
-('email.smtp.host', 'mail.internal.corp', 'STRING', 'NOTIFICATION', 'Y', '20060101'),
-('email.smtp.password', 'smtp_pass_2006!', 'STRING', 'NOTIFICATION', 'Y', '20060101'),
-('db.pool.size', 'UNKNOWN', 'NUMBER', 'CORE', 'Y', '20050101'),
-('feature.loyalty.enabled', '0', 'BOOLEAN', 'FEATURE_FLAG', 'N', '20070901');
-
--- ============================================================
--- Migration log entries (if table exists)
--- ============================================================
-INSERT IGNORE INTO migration_log (migration_name, script_file, executed_by, executed_at, status, duration_ms) VALUES
-('Initial schema', 'create-tables.sql', 'dev1', '20050301120000', 'COMPLETED', '1520'),
-('Add supplier tables', 'add-suppliers.sql', 'dev2', '20060401090000', 'COMPLETED', '830'),
-('Add indexes (attempt 1)', 'add-indexes-v1.sql', 'dev3', '20110315140000', 'FAILED', 'UNKNOWN'),
-('Add indexes (attempt 2)', 'add-indexes-v2.sql', 'dev3', '20110316100000', 'COMPLETED', '45200'),
-('Add timestamps (abandoned)', 'add-timestamps.sql', 'dev4', '20140215110000', 'PARTIAL', 'UNKNOWN');

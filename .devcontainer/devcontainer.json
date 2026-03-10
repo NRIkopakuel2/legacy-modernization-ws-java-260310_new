@@ -115,7 +115,7 @@
         "LC_ALL": "C.UTF-8"
     },
     // デバッグ設定のサポート
-    "initializeCommand": "bash -c 'echo \"Starting host services for Dev Container...\" && bash ${localWorkspaceFolder}/.devcontainer/scripts/cleanup-old-containers.sh && docker compose -f ${localWorkspaceFolder}/.devcontainer/compose.services.yaml up -d --remove-orphans tomcat mysql phpmyadmin && echo \"Host services started\"'",
+    "initializeCommand": "powershell -Command \"Write-Host 'Starting host services for Dev Container...'; docker compose -f '${localWorkspaceFolder}/.devcontainer/compose.services.yaml' down --remove-orphans 2>$null; docker compose -f '${localWorkspaceFolder}/.devcontainer/compose.services.yaml' up -d tomcat mysql phpmyadmin; Write-Host 'Host services started'\"",
     // コンテナのユーザー設定
     "remoteUser": "javauser",
     // ライフサイクルスクリプト
