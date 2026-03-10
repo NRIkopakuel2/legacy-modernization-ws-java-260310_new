@@ -111,3 +111,4 @@ core.*
 # Config generated at runtime
 .config/
 .jdk/
+.jdk/
